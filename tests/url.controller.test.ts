@@ -62,7 +62,9 @@ describe("resolveUrlController", () => {
   it("redirects to the resolved original URL", async () => {
     const request = {
       params: { code: "example" },
-    } as Request<{ code: string }>;
+      ip: "127.0.0.1",
+      get: vi.fn().mockReturnValue("curl/8.7.1"),
+    } as unknown as Request<{ code: string }>;
     const redirect = vi.fn();
     const response = { redirect } as unknown as Response;
 
@@ -70,7 +72,10 @@ describe("resolveUrlController", () => {
 
     await resolveUrlController(request, response);
 
-    expect(resolveUrl).toHaveBeenCalledWith("example");
+    expect(resolveUrl).toHaveBeenCalledWith("example", {
+      ip: "127.0.0.1",
+      userAgent: "curl/8.7.1",
+    });
     expect(redirect).toHaveBeenCalledWith(
       302,
       "https://example.com/destination",

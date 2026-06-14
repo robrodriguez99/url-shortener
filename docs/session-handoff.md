@@ -33,8 +33,11 @@ after the backend flows work.
 - The Redis client uses the official `redis` package.
 - Redis connection and disconnection are integrated into the API lifecycle.
 - Redis startup failure is non-fatal; the API continues using MongoDB.
+- RabbitMQ uses `amqplib` with a durable direct exchange and queue.
+- RabbitMQ connection and disconnection are integrated into the API lifecycle.
+- RabbitMQ startup failure is non-fatal; redirects continue without publishing.
 - The API connects to MongoDB before opening its HTTP port.
-- `SIGINT` and `SIGTERM` trigger graceful HTTP/MongoDB/Redis shutdown.
+- `SIGINT` and `SIGTERM` trigger graceful HTTP/MongoDB/Redis/RabbitMQ shutdown.
 - `GET /health` returns `{ "status": "ok" }`.
 
 ### URL module
@@ -101,8 +104,13 @@ GET /:code
   -> findShortUrlByCode repository on miss
   -> MongoDB fallback
   -> populate Redis
+  -> publish tinyurl.accessed.v1
   -> 302 redirect
 ```
+
+Publishing occurs for both cache hits and MongoDB resolutions. Events contain a UUID,
+an ISO timestamp, the code, and optional request IP and user agent. Publication
+failure is logged and does not block the redirect.
 
 Supported requests:
 
@@ -136,11 +144,14 @@ Implemented:
 
 - `click.schemas.ts` for `tinyurl.accessed.v1`;
 - `click.model.ts`;
+- `click.publisher.ts`:
+  - validates events with Zod;
+  - publishes persistent JSON messages;
+  - waits for broker confirmation;
 - unique index on `eventId`;
 - compound index `{ code: 1, occurredAt: -1 }`.
 
-RabbitMQ publishing, consumption, and click persistence repositories are not yet
-implemented.
+RabbitMQ consumption and click persistence repositories are not yet implemented.
 
 ### Error handling
 
@@ -185,8 +196,8 @@ codes.
 
 At this handoff:
 
-- 9 test files;
-- 29 tests;
+- 10 test files;
+- 34 tests;
 - typecheck passes;
 - lint passes;
 - build passes;
@@ -202,38 +213,37 @@ Covered areas:
 - URL resolution service behavior;
 - URL cache keys and TTL;
 - cache hit, cache miss, Redis read failure, and Redis write failure;
+- event payload, persistent publishing, and broker confirmation;
+- event publication success and non-fatal failure;
 - URL redirect and resolution HTTP behavior;
 - MongoDB duplicate-key translation;
 - HTTP error serialization.
 
 ## Next Task
 
-Implement RabbitMQ publishing for successful URL resolutions.
+Implement the RabbitMQ worker and click persistence flow.
 
-Extend the current cache-aside resolution flow:
+Consume the events already published by the API:
 
 ```text
-GET /:code
-  -> Redis cache
-  -> MongoDB fallback
-  -> populate Redis
-  -> publish tinyurl.accessed.v1
-  -> 302 redirect
+tinyurl.accessed.persist
+  -> validate tinyurl.accessed.v1
+  -> persist in click_events
+  -> acknowledge after persistence
 ```
 
 Tasks:
 
-1. Add RabbitMQ client dependency and connection lifecycle.
-2. Publish persistent `tinyurl.accessed.v1` events after successful resolution.
-3. Do not block a valid redirect if event publication fails; log the failure.
-4. Add publisher success and failure tests.
-
-Do not implement the worker in these two stages. The worker is the following vertical
-flow after publishing works.
+1. Add the worker entrypoint and RabbitMQ consumer.
+2. Add the click repository.
+3. Validate each event before persistence.
+4. Treat duplicate `eventId` values as already processed.
+5. Acknowledge only after persistence.
+6. Add the worker service to Compose.
+7. Add consumer and repository tests.
 
 ## Known Pending Work
 
-- RabbitMQ connection and publisher.
 - Worker and RabbitMQ consumer.
 - Click repository and statistics endpoint.
 - Minimal frontend.
@@ -251,6 +261,8 @@ npm run docker:up
 npm run docker:logs
 npm run docker:logs:api
 npm run docker:mongo
+npm run docker:redis
+npm run docker:rabbitmq
 npm run docker:down
 ```
 

@@ -1,12 +1,15 @@
 import { describe, expect, it } from "vitest";
 
-import { tinyUrlAccessedEventSchema } from "../src/modules/clicks/click.schemas.js";
+import {
+  TINY_URL_ACCESSED_EVENT_TYPE,
+  tinyUrlAccessedEventSchema,
+} from "../src/modules/clicks/click.schemas.js";
 
 describe("tinyUrlAccessedEventSchema", () => {
   it("accepts a valid click event", () => {
     const result = tinyUrlAccessedEventSchema.safeParse({
       eventId: "a9df919d-8e2a-44d6-84d6-63304c86267f",
-      type: "tinyurl.accessed.v1",
+      type: TINY_URL_ACCESSED_EVENT_TYPE,
       occurredAt: "2026-06-11T15:30:00.000Z",
       data: {
         code: "AbC123",

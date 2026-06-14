@@ -204,14 +204,16 @@ Comportamiento:
 4. Si MongoDB devuelve una URL, guardarla en Redis con el TTL configurado.
 5. Si no existe, responder `404 Not Found` con
    `SHORT_URL_NOT_FOUND`.
-6. Responder con redirect temporal `302 Found` a la URL original.
+6. Publicar `tinyurl.accessed.v1`.
+7. Responder con redirect temporal `302 Found` a la URL original.
 
 MongoDB sigue siendo la fuente de verdad. Los fallos de lectura o escritura en Redis
 se registran, pero no impiden resolver mediante MongoDB ni responder un redirect
 válido.
 
-La siguiente extensión publicará `tinyurl.accessed.v1` después de una resolución
-exitosa y mantendrá el redirect aunque la publicación falle.
+Después de una resolución exitosa, la API publica `tinyurl.accessed.v1`. La
+publicación usa un canal de confirmación, pero cualquier fallo se registra y no cambia
+el redirect válido.
 
 Se usa `302` para evitar que clientes o navegadores conviertan la redirección en una
 decisión permanente y dejen de llegar accesos a la aplicación.
@@ -295,6 +297,11 @@ estadísticas usan `occurredAt`, no el orden de inserción.
 
 La combinación de reentrega e índice único en `eventId` da un procesamiento
 efectivamente idempotente frente a duplicados.
+
+La validación con Zod verifica el contrato, no la identidad del productor. En esta
+versión, la autenticidad depende de credenciales y permisos de RabbitMQ y del
+aislamiento de red. Firmas HMAC y rotación de secretos quedan como endurecimiento
+futuro si el modelo de amenazas incluye productores internos no confiables.
 
 ### Límite de consistencia
 

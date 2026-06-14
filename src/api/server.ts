@@ -8,6 +8,10 @@ import {
   connectRedis,
   disconnectRedis,
 } from "../infrastructure/redis/connection.js";
+import {
+  connectRabbitMq,
+  disconnectRabbitMq,
+} from "../infrastructure/rabbitmq/connection.js";
 import { logger } from "../shared/logger/logger.js";
 
 async function startServer(): Promise<void> {
@@ -19,6 +23,15 @@ async function startServer(): Promise<void> {
     logger.warn(
       { err: error },
       "Redis unavailable at startup; continuing without cache",
+    );
+  }
+
+  try {
+    await connectRabbitMq();
+  } catch (error) {
+    logger.warn(
+      { err: error },
+      "RabbitMQ unavailable at startup; continuing without event publishing",
     );
   }
 
@@ -49,7 +62,11 @@ async function startServer(): Promise<void> {
         });
       });
 
-      await Promise.all([disconnectRedis(), disconnectMongo()]);
+      await Promise.all([
+        disconnectRabbitMq(),
+        disconnectRedis(),
+        disconnectMongo(),
+      ]);
     } catch (error) {
       logger.error({ err: error }, "failed to shut down cleanly");
       process.exitCode = 1;

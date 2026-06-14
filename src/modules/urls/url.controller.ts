@@ -20,7 +20,11 @@ export async function resolveUrlController(
   request: Request<{ code: string }>,
   response: Response,
 ): Promise<void> {
-  const originalUrl = await resolveUrl(request.params.code);
+  const userAgent = request.get("user-agent");
+  const originalUrl = await resolveUrl(request.params.code, {
+    ...(request.ip === undefined ? {} : { ip: request.ip }),
+    ...(userAgent === undefined ? {} : { userAgent }),
+  });
 
   response.redirect(302, originalUrl);
 }

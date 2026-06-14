@@ -1,5 +1,10 @@
-import { randomBytes } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 
+import { publishTinyUrlAccessedEvent } from "../clicks/click.publisher.js";
+import {
+  TINY_URL_ACCESSED_EVENT_TYPE,
+  type TinyUrlAccessedEvent,
+} from "../clicks/click.schemas.js";
 import {
   cacheOriginalUrl,
   getCachedOriginalUrl,
@@ -48,6 +53,16 @@ type ResolveUrlDependencies = {
     code: string,
     originalUrl: string,
   ) => Promise<void>;
+  publishTinyUrlAccessedEvent: (
+    event: TinyUrlAccessedEvent,
+  ) => Promise<void>;
+  createEventId: () => string;
+  getCurrentDate: () => Date;
+};
+
+export type ResolveUrlContext = {
+  ip?: string;
+  userAgent?: string;
 };
 
 const defaultCreateUrlDependencies: CreateUrlDependencies = {
@@ -60,6 +75,9 @@ const defaultResolveUrlDependencies: ResolveUrlDependencies = {
   getCachedOriginalUrl,
   findShortUrlByCode,
   cacheOriginalUrl,
+  publishTinyUrlAccessedEvent,
+  createEventId: randomUUID,
+  getCurrentDate: () => new Date(),
 };
 
 export async function createUrl(
@@ -101,6 +119,7 @@ export async function createUrl(
 
 export async function resolveUrl(
   code: unknown,
+  context: ResolveUrlContext = {},
   dependencies: ResolveUrlDependencies = defaultResolveUrlDependencies,
 ): Promise<string> {
   const validatedCode = shortUrlCodeSchema.parse(code);
@@ -110,6 +129,7 @@ export async function resolveUrl(
   );
 
   if (cachedOriginalUrl !== null) {
+    await publishAccessEvent(validatedCode, context, dependencies);
     return cachedOriginalUrl;
   }
 
@@ -124,8 +144,35 @@ export async function resolveUrl(
     shortUrl.originalUrl,
     dependencies,
   );
+  await publishAccessEvent(validatedCode, context, dependencies);
 
   return shortUrl.originalUrl;
+}
+
+async function publishAccessEvent(
+  code: string,
+  context: ResolveUrlContext,
+  dependencies: ResolveUrlDependencies,
+): Promise<void> {
+  try {
+    await dependencies.publishTinyUrlAccessedEvent({
+      eventId: dependencies.createEventId(),
+      type: TINY_URL_ACCESSED_EVENT_TYPE,
+      occurredAt: dependencies.getCurrentDate().toISOString(),
+      data: {
+        code,
+        ...(context.ip === undefined ? {} : { ip: context.ip }),
+        ...(context.userAgent === undefined
+          ? {}
+          : { userAgent: context.userAgent }),
+      },
+    });
+  } catch (error) {
+    urlServiceLogger.warn(
+      { err: error, code },
+      "failed to publish short URL access event",
+    );
+  }
 }
 
 async function readCachedOriginalUrl(

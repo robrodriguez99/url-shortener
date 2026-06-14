@@ -10,8 +10,29 @@ import {
   createUrl,
   resolveUrl,
 } from "../src/modules/urls/url.service.js";
+import { TINY_URL_ACCESSED_EVENT_TYPE } from "../src/modules/clicks/click.schemas.js";
 
 const baseUrl = "http://localhost:3000";
+const eventId = "a9df919d-8e2a-44d6-84d6-63304c86267f";
+const occurredAt = new Date("2026-06-14T12:00:00.000Z");
+
+type ResolveUrlDependencies = NonNullable<
+  Parameters<typeof resolveUrl>[2]
+>;
+
+function createResolveUrlDependencies(
+  overrides: Partial<ResolveUrlDependencies> = {},
+): ResolveUrlDependencies {
+  return {
+    getCachedOriginalUrl: vi.fn().mockResolvedValue(null),
+    findShortUrlByCode: vi.fn().mockResolvedValue(null),
+    cacheOriginalUrl: vi.fn().mockResolvedValue(undefined),
+    publishTinyUrlAccessedEvent: vi.fn().mockResolvedValue(undefined),
+    createEventId: vi.fn().mockReturnValue(eventId),
+    getCurrentDate: vi.fn().mockReturnValue(occurredAt),
+    ...overrides,
+  };
+}
 
 describe("createUrl", () => {
   it("creates a short URL with a custom alias", async () => {
@@ -148,18 +169,39 @@ describe("resolveUrl", () => {
   it("returns a cached original URL without querying MongoDB", async () => {
     const findShortUrlByCode = vi.fn();
     const cacheOriginalUrl = vi.fn();
+    const publishTinyUrlAccessedEvent = vi
+      .fn()
+      .mockResolvedValue(undefined);
 
-    const result = await resolveUrl("cached-code", {
-      getCachedOriginalUrl: vi
-        .fn()
-        .mockResolvedValue("https://example.com/cached"),
-      findShortUrlByCode,
-      cacheOriginalUrl,
-    });
+    const result = await resolveUrl(
+      "cached-code",
+      {
+        ip: "127.0.0.1",
+        userAgent: "curl/8.7.1",
+      },
+      createResolveUrlDependencies({
+        getCachedOriginalUrl: vi
+          .fn()
+          .mockResolvedValue("https://example.com/cached"),
+        findShortUrlByCode,
+        cacheOriginalUrl,
+        publishTinyUrlAccessedEvent,
+      }),
+    );
 
     expect(result).toBe("https://example.com/cached");
     expect(findShortUrlByCode).not.toHaveBeenCalled();
     expect(cacheOriginalUrl).not.toHaveBeenCalled();
+    expect(publishTinyUrlAccessedEvent).toHaveBeenCalledWith({
+      eventId,
+      type: TINY_URL_ACCESSED_EVENT_TYPE,
+      occurredAt: "2026-06-14T12:00:00.000Z",
+      data: {
+        code: "cached-code",
+        ip: "127.0.0.1",
+        userAgent: "curl/8.7.1",
+      },
+    });
   });
 
   it("queries MongoDB and populates the cache on a cache miss", async () => {
@@ -168,11 +210,14 @@ describe("resolveUrl", () => {
     });
     const cacheOriginalUrl = vi.fn().mockResolvedValue(undefined);
 
-    const result = await resolveUrl("existing-code", {
-      getCachedOriginalUrl: vi.fn().mockResolvedValue(null),
-      findShortUrlByCode,
-      cacheOriginalUrl,
-    });
+    const result = await resolveUrl(
+      "existing-code",
+      {},
+      createResolveUrlDependencies({
+        findShortUrlByCode,
+        cacheOriginalUrl,
+      }),
+    );
 
     expect(findShortUrlByCode).toHaveBeenCalledWith("existing-code");
     expect(cacheOriginalUrl).toHaveBeenCalledWith(
@@ -183,13 +228,19 @@ describe("resolveUrl", () => {
   });
 
   it("throws a not found error for a missing code", async () => {
+    const publishTinyUrlAccessedEvent = vi.fn();
+
     await expect(
-      resolveUrl("missing-code", {
-        getCachedOriginalUrl: vi.fn().mockResolvedValue(null),
-        findShortUrlByCode: vi.fn().mockResolvedValue(null),
-        cacheOriginalUrl: vi.fn(),
-      }),
+      resolveUrl(
+        "missing-code",
+        {},
+        createResolveUrlDependencies({
+          publishTinyUrlAccessedEvent,
+        }),
+      ),
     ).rejects.toBeInstanceOf(ShortUrlNotFoundError);
+
+    expect(publishTinyUrlAccessedEvent).not.toHaveBeenCalled();
   });
 
   it("falls back to MongoDB when reading from Redis fails", async () => {
@@ -197,28 +248,51 @@ describe("resolveUrl", () => {
       originalUrl: "https://example.com/fallback",
     });
 
-    const result = await resolveUrl("existing-code", {
-      getCachedOriginalUrl: vi
-        .fn()
-        .mockRejectedValue(new Error("Redis unavailable")),
-      findShortUrlByCode,
-      cacheOriginalUrl: vi.fn().mockResolvedValue(undefined),
-    });
+    const result = await resolveUrl(
+      "existing-code",
+      {},
+      createResolveUrlDependencies({
+        getCachedOriginalUrl: vi
+          .fn()
+          .mockRejectedValue(new Error("Redis unavailable")),
+        findShortUrlByCode,
+      }),
+    );
 
     expect(findShortUrlByCode).toHaveBeenCalledWith("existing-code");
     expect(result).toBe("https://example.com/fallback");
   });
 
   it("returns the MongoDB URL when writing to Redis fails", async () => {
-    const result = await resolveUrl("existing-code", {
-      getCachedOriginalUrl: vi.fn().mockResolvedValue(null),
-      findShortUrlByCode: vi.fn().mockResolvedValue({
-        originalUrl: "https://example.com/destination",
+    const result = await resolveUrl(
+      "existing-code",
+      {},
+      createResolveUrlDependencies({
+        findShortUrlByCode: vi.fn().mockResolvedValue({
+          originalUrl: "https://example.com/destination",
+        }),
+        cacheOriginalUrl: vi
+          .fn()
+          .mockRejectedValue(new Error("Redis unavailable")),
       }),
-      cacheOriginalUrl: vi
-        .fn()
-        .mockRejectedValue(new Error("Redis unavailable")),
-    });
+    );
+
+    expect(result).toBe("https://example.com/destination");
+  });
+
+  it("returns the resolved URL when event publication fails", async () => {
+    const result = await resolveUrl(
+      "existing-code",
+      {},
+      createResolveUrlDependencies({
+        findShortUrlByCode: vi.fn().mockResolvedValue({
+          originalUrl: "https://example.com/destination",
+        }),
+        publishTinyUrlAccessedEvent: vi
+          .fn()
+          .mockRejectedValue(new Error("RabbitMQ unavailable")),
+      }),
+    );
 
     expect(result).toBe("https://example.com/destination");
   });
@@ -226,16 +300,22 @@ describe("resolveUrl", () => {
   it("validates the code before calling the repository", async () => {
     const getCachedOriginalUrl = vi.fn();
     const findShortUrlByCode = vi.fn();
+    const publishTinyUrlAccessedEvent = vi.fn();
 
     await expect(
-      resolveUrl("invalid code", {
-        getCachedOriginalUrl,
-        findShortUrlByCode,
-        cacheOriginalUrl: vi.fn(),
-      }),
+      resolveUrl(
+        "invalid code",
+        {},
+        createResolveUrlDependencies({
+          getCachedOriginalUrl,
+          findShortUrlByCode,
+          publishTinyUrlAccessedEvent,
+        }),
+      ),
     ).rejects.toMatchObject({ name: "ZodError" });
 
     expect(getCachedOriginalUrl).not.toHaveBeenCalled();
     expect(findShortUrlByCode).not.toHaveBeenCalled();
+    expect(publishTinyUrlAccessedEvent).not.toHaveBeenCalled();
   });
 });

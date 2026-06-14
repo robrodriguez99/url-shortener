@@ -52,6 +52,7 @@ npm run docker:logs
 npm run docker:logs:api
 npm run docker:mongo
 npm run docker:redis
+npm run docker:rabbitmq
 npm run docker:ps
 npm run docker:down
 ```
@@ -76,6 +77,12 @@ Open MongoDB and Redis shells:
 ```bash
 npm run docker:mongo
 npm run docker:redis
+```
+
+Inspect RabbitMQ queue message counts:
+
+```bash
+npm run docker:rabbitmq
 ```
 
 When `package.json` or `package-lock.json` changes while Compose is already running,
@@ -287,6 +294,32 @@ Check its remaining TTL with:
 docker compose exec redis redis-cli TTL short-url:example
 ```
 
+## RabbitMQ
+
+Every successful `GET /:code` publishes a `tinyurl.accessed.v1` event. The API
+declares this durable topology when it connects:
+
+```text
+direct exchange: tinyurl.events
+routing key:     tinyurl.accessed.v1
+durable queue:   tinyurl.accessed.persist
+```
+
+Messages are JSON, marked persistent, and published through a confirmation channel.
+Publishing or connection failures are logged but do not prevent a valid `302`
+redirect.
+
+Inspect queue message counts from the terminal:
+
+```bash
+npm run docker:rabbitmq
+```
+
+The RabbitMQ Management UI is available at `http://localhost:15672`. Use the
+`RABBITMQ_USER` and `RABBITMQ_PASSWORD` values from `.env`. Until the worker is
+implemented, successfully published events remain ready in
+`tinyurl.accessed.persist`.
+
 ## Main Libraries
 
 | Library | Purpose |
@@ -294,6 +327,7 @@ docker compose exec redis redis-cli TTL short-url:example
 | `express` | HTTP server, routes, and middleware |
 | `mongoose` | MongoDB models, indexes, queries, and connection |
 | `redis` | Redis client and URL resolution cache |
+| `amqplib` | RabbitMQ connection, topology, and event publishing |
 | `zod` | Runtime validation and TypeScript type inference |
 | `dotenv` | Loads local `.env` variables |
 | `pino` | Structured application logging |
@@ -303,5 +337,3 @@ docker compose exec redis redis-cli TTL short-url:example
 | `supertest` | HTTP integration tests |
 | `tsx` | Runs TypeScript directly during development |
 | `typescript-eslint` | TypeScript-aware linting |
-
-The RabbitMQ client library will be added when event publishing is implemented.

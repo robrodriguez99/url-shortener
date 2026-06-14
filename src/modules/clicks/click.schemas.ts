@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+export const TINY_URL_ACCESSED_EVENT_TYPE = "tinyurl.accessed.v1";
+
 const clickCodeSchema = z
   .string()
   .min(3)
@@ -8,7 +10,7 @@ const clickCodeSchema = z
 
 export const tinyUrlAccessedEventSchema = z.object({
   eventId: z.uuid(),
-  type: z.literal("tinyurl.accessed.v1"),
+  type: z.literal(TINY_URL_ACCESSED_EVENT_TYPE),
   occurredAt: z.iso.datetime(),
   data: z.object({
     code: clickCodeSchema,
