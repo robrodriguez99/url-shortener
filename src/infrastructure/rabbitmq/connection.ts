@@ -1,4 +1,5 @@
 import amqp, {
+  type Channel,
   type ChannelModel,
   type ConfirmChannel,
 } from "amqplib";
@@ -63,6 +64,14 @@ export function getRabbitMqPublisherChannel(): ConfirmChannel {
   }
 
   return publisherChannel;
+}
+
+export async function createRabbitMqConsumerChannel(): Promise<Channel> {
+  if (connection === undefined) {
+    throw new Error("RabbitMQ connection is not available");
+  }
+
+  return connection.createChannel();
 }
 
 export async function disconnectRabbitMq(): Promise<void> {

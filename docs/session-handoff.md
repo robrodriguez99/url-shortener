@@ -20,10 +20,10 @@ after the backend flows work.
 - Development and production Dockerfile stages.
 - Docker Compose services:
   - API;
+  - worker;
   - MongoDB;
   - Redis;
   - RabbitMQ with Management UI.
-- The worker is not yet in Compose because its entrypoint does not exist.
 - `README.md` documents setup, commands, logging, MongoDB access, and library roles.
 
 ### Infrastructure
@@ -34,7 +34,8 @@ after the backend flows work.
 - Redis connection and disconnection are integrated into the API lifecycle.
 - Redis startup failure is non-fatal; the API continues using MongoDB.
 - RabbitMQ uses `amqplib` with a durable direct exchange and queue.
-- RabbitMQ connection and disconnection are integrated into the API lifecycle.
+- RabbitMQ connection and disconnection are integrated into the API and worker
+  lifecycles.
 - RabbitMQ startup failure is non-fatal; redirects continue without publishing.
 - The API connects to MongoDB before opening its HTTP port.
 - `SIGINT` and `SIGTERM` trigger graceful HTTP/MongoDB/Redis/RabbitMQ shutdown.
@@ -84,7 +85,7 @@ Implemented:
   - registers `GET /:code` after the API routes;
   - is mounted in `src/api/app.ts` before `errorHandler`.
 
-The creation and basic resolution flows are implemented end to end:
+The creation and resolution flows are implemented end to end:
 
 ```text
 POST /api/urls
@@ -148,10 +149,33 @@ Implemented:
   - validates events with Zod;
   - publishes persistent JSON messages;
   - waits for broker confirmation;
+- `click.repository.ts`:
+  - persists access events in `click_events`;
+  - maps duplicate `eventId` errors to an idempotent `duplicate` result;
+- `click.consumer.ts`:
+  - validates and parses messages;
+  - acknowledges created and duplicate events;
+  - requeues transient persistence failures;
+  - rejects invalid messages without requeue;
+  - limits in-flight messages with `prefetch(10)`;
 - unique index on `eventId`;
 - compound index `{ code: 1, occurredAt: -1 }`.
 
-RabbitMQ consumption and click persistence repositories are not yet implemented.
+The worker entrypoint connects to MongoDB and RabbitMQ, starts the consumer, and
+handles graceful shutdown. The worker is registered in Docker Compose.
+
+The complete flow has been verified against the Dockerized services:
+
+```text
+GET /:code
+  -> RabbitMQ
+  -> worker
+  -> click_events
+  -> ack
+```
+
+Two concurrent GET requests produced two persisted events, and the queue returned to
+zero ready and unacknowledged messages.
 
 ### Error handling
 
@@ -190,14 +214,14 @@ codes.
 - URL creation logs `code` and whether it used a custom alias.
 - Original destination URLs, authorization headers, and cookies are not logged.
 - Runtime logs are written to stdout and are visible through
-  `npm run docker:logs:api`.
+  `npm run docker:logs:api` and `npm run docker:logs:worker`.
 
 ## Tests
 
 At this handoff:
 
-- 10 test files;
-- 34 tests;
+- 12 test files;
+- 46 tests;
 - typecheck passes;
 - lint passes;
 - build passes;
@@ -215,39 +239,38 @@ Covered areas:
 - cache hit, cache miss, Redis read failure, and Redis write failure;
 - event payload, persistent publishing, and broker confirmation;
 - event publication success and non-fatal failure;
+- click persistence and duplicate event idempotency;
+- consumer acknowledgement, rejection, and requeue policies;
 - URL redirect and resolution HTTP behavior;
 - MongoDB duplicate-key translation;
 - HTTP error serialization.
 
 ## Next Task
 
-Implement the RabbitMQ worker and click persistence flow.
+Implement the URL statistics endpoint.
 
-Consume the events already published by the API:
+Read the events persisted by the worker:
 
 ```text
-tinyurl.accessed.persist
-  -> validate tinyurl.accessed.v1
-  -> persist in click_events
-  -> acknowledge after persistence
+GET /api/stats/:code
+  -> validate code
+  -> verify URL exists
+  -> count click_events
+  -> find latest occurredAt
 ```
 
 Tasks:
 
-1. Add the worker entrypoint and RabbitMQ consumer.
-2. Add the click repository.
-3. Validate each event before persistence.
-4. Treat duplicate `eventId` values as already processed.
-5. Acknowledge only after persistence.
-6. Add the worker service to Compose.
-7. Add consumer and repository tests.
+1. Add click count and latest-click repository queries.
+2. Add a statistics service and result type.
+3. Reuse `ShortUrlNotFoundError` for unknown valid codes.
+4. Add controller and `GET /api/stats/:code` before `GET /:code`.
+5. Add unit and HTTP tests.
 
 ## Known Pending Work
 
-- Worker and RabbitMQ consumer.
-- Click repository and statistics endpoint.
+- Click statistics queries and endpoint.
 - Minimal frontend.
-- Add the worker service to Compose after its entrypoint exists.
 
 ## Commands
 
@@ -260,6 +283,7 @@ npm run build
 npm run docker:up
 npm run docker:logs
 npm run docker:logs:api
+npm run docker:logs:worker
 npm run docker:mongo
 npm run docker:redis
 npm run docker:rabbitmq

@@ -291,6 +291,11 @@ Flujo del worker:
 6. Ante un error transitorio de MongoDB, usar `nack` con requeue.
 7. Ante un mensaje inválido, registrarlo y descartarlo sin requeue para evitar un loop.
 
+El worker usa `prefetch(10)` para limitar mensajes en vuelo por proceso. Cada proceso
+mantiene su propia conexión y canal; no existe un singleton distribuido entre
+instancias. Se pueden ejecutar múltiples workers sobre la misma cola y RabbitMQ
+reparte los mensajes entre ellos.
+
 RabbitMQ entrega normalmente en FIFO, pero el sistema no depende de un orden estricto.
 Las reentregas y múltiples consumidores pueden alterar el orden observado. Las
 estadísticas usan `occurredAt`, no el orden de inserción.
@@ -383,9 +388,8 @@ comando de inicio. Compose incluye:
 - puertos públicos solo para API y herramientas de desarrollo;
 - variables desde `.env`.
 
-Estado actual: Compose incluye `api`, `mongo`, `redis` y `rabbitmq`. El servicio
-`worker` se agregará cuando exista su entrypoint, para no mantener un contenedor que
-no puede iniciar.
+Estado actual: Compose incluye `api`, `worker`, `mongo`, `redis` y `rabbitmq`. API y
+worker usan volúmenes `node_modules` separados durante desarrollo.
 
 Puertos locales sugeridos:
 

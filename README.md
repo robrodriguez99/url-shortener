@@ -42,6 +42,7 @@ Compose refuses to start if either variable is missing.
 
 ```bash
 npm run dev
+npm run worker:dev
 npm run typecheck
 npm run lint
 npm test
@@ -50,6 +51,7 @@ npm run build
 npm run docker:up
 npm run docker:logs
 npm run docker:logs:api
+npm run docker:logs:worker
 npm run docker:mongo
 npm run docker:redis
 npm run docker:rabbitmq
@@ -65,11 +67,12 @@ Check container status and health:
 npm run docker:ps
 ```
 
-Follow all service logs or only API logs:
+Follow all service logs, API logs, or worker logs:
 
 ```bash
 npm run docker:logs
 npm run docker:logs:api
+npm run docker:logs:worker
 ```
 
 Open MongoDB and Redis shells:
@@ -86,14 +89,16 @@ npm run docker:rabbitmq
 ```
 
 When `package.json` or `package-lock.json` changes while Compose is already running,
-update the persistent API `node_modules` volume and restart the service:
+update the persistent API and worker `node_modules` volumes and restart both services:
 
 ```bash
 docker compose run --rm api npm ci
-docker compose restart api
+docker compose run --rm worker npm ci
+docker compose restart api worker
 ```
 
-Rebuilding the image alone does not update the mounted `api_node_modules` volume.
+Rebuilding the image alone does not update the mounted `api_node_modules` and
+`worker_node_modules` volumes.
 
 ## Creating URLs
 
@@ -249,6 +254,10 @@ db.shorturls.findOne({ code: "example" })
 
 db.shorturls.countDocuments()
 
+db.click_events.find().sort({ occurredAt: -1 }).pretty()
+
+db.click_events.countDocuments()
+
 exit
 ```
 
@@ -309,6 +318,13 @@ Messages are JSON, marked persistent, and published through a confirmation chann
 Publishing or connection failures are logged but do not prevent a valid `302`
 redirect.
 
+The worker consumes `tinyurl.accessed.persist` with manual acknowledgements:
+
+- valid events are persisted in MongoDB before `ack`;
+- duplicate `eventId` values are treated as already processed and acknowledged;
+- transient persistence failures use `nack` with requeue;
+- malformed messages are rejected without requeue.
+
 Inspect queue message counts from the terminal:
 
 ```bash
@@ -316,9 +332,50 @@ npm run docker:rabbitmq
 ```
 
 The RabbitMQ Management UI is available at `http://localhost:15672`. Use the
-`RABBITMQ_USER` and `RABBITMQ_PASSWORD` values from `.env`. Until the worker is
-implemented, successfully published events remain ready in
-`tinyurl.accessed.persist`.
+`RABBITMQ_USER` and `RABBITMQ_PASSWORD` values from `.env`. With the worker running,
+ready messages are normally consumed quickly and persisted in `click_events`.
+
+### Testing the worker
+
+Resolve an existing code and inspect its latest persisted event:
+
+```bash
+curl -i http://localhost:3000/example
+
+docker compose exec -T mongo mongosh --quiet url_shortener --eval \
+  'db.click_events.find({code:"example"}).sort({occurredAt:-1}).limit(1).toArray()'
+```
+
+To test two concurrent messages, first create a dedicated URL:
+
+```bash
+curl -X POST http://localhost:3000/api/urls \
+  -H "Content-Type: application/json" \
+  -d '{"originalUrl":"https://example.com","alias":"worker-concurrency-test"}'
+```
+
+Check its current event count:
+
+```bash
+docker compose exec -T mongo mongosh --quiet url_shortener --eval \
+  'db.click_events.countDocuments({code:"worker-concurrency-test"})'
+```
+
+Send two requests concurrently:
+
+```bash
+printf '1\n2\n' | xargs -P2 -I{} \
+  curl -s -o /dev/null -w "request {}: %{http_code}\n" \
+  http://localhost:3000/worker-concurrency-test
+```
+
+Run the count command again. It should increase by `2`. You can also confirm that the
+queue has been drained and inspect worker logs:
+
+```bash
+npm run docker:rabbitmq
+npm run docker:logs:worker
+```
 
 ## Main Libraries
 
@@ -327,7 +384,7 @@ implemented, successfully published events remain ready in
 | `express` | HTTP server, routes, and middleware |
 | `mongoose` | MongoDB models, indexes, queries, and connection |
 | `redis` | Redis client and URL resolution cache |
-| `amqplib` | RabbitMQ connection, topology, and event publishing |
+| `amqplib` | RabbitMQ connection, topology, publishing, and consumption |
 | `zod` | Runtime validation and TypeScript type inference |
 | `dotenv` | Loads local `.env` variables |
 | `pino` | Structured application logging |
