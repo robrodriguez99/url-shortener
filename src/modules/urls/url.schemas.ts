@@ -10,16 +10,11 @@ export const shortUrlCodeSchema = z
   });
 
 export const createUrlSchema = z.object({
-  originalUrl: z.url("originalUrl must be valid").refine(validateUrlProtocol, {
-    message: "originalUrl must use HTTP or HTTPS",
+  originalUrl: z.url({
+    protocol: /^https?$/,
+    error: "originalUrl must be a valid HTTP or HTTPS URL",
   }),
   alias: shortUrlCodeSchema.optional(),
 });
 
 export type CreateUrlInput = z.infer<typeof createUrlSchema>;
-
-function validateUrlProtocol(value: string): boolean {
-  const protocol = new URL(value).protocol;
-
-  return protocol === "http:" || protocol === "https:";
-}

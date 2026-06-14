@@ -18,6 +18,12 @@ describe("createUrlSchema", () => {
     ).toBe(false);
   });
 
+  it("rejects malformed URLs without throwing", () => {
+    const result = createUrlSchema.safeParse({ originalUrl: "nuevaurl" });
+
+    expect(result.success).toBe(false);
+  });
+
   it("validates an optional alias", () => {
     expect(
       createUrlSchema.safeParse({

@@ -30,6 +30,34 @@ describe("POST /api/urls", () => {
       },
     });
   });
+
+  it("returns 400 for a malformed URL", async () => {
+    const response = await request(createApp()).post("/api/urls").send({
+      originalUrl: "nuevaurl",
+    });
+    const body = response.body as {
+      error: {
+        details: Array<{
+          path: string;
+          message: string;
+        }>;
+      };
+    };
+
+    expect(response.status).toBe(400);
+    expect(response.body).toMatchObject({
+      error: {
+        code: "VALIDATION_ERROR",
+        message: "Invalid request data",
+      },
+    });
+    expect(body.error.details).toEqual([
+      {
+        path: "originalUrl",
+        message: "originalUrl must be a valid HTTP or HTTPS URL",
+      },
+    ]);
+  });
 });
 
 describe("GET /:code", () => {
