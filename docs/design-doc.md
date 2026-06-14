@@ -199,18 +199,19 @@ Comportamiento:
 
 1. Validar que `code` tenga entre 3 y 50 caracteres y solo contenga caracteres
    alfanuméricos, `-` o `_`.
-2. Buscar el código en MongoDB.
-3. Si no existe, responder `404 Not Found` con
+2. Buscar el código en Redis.
+3. Ante un cache miss o error de Redis, buscar el código en MongoDB.
+4. Si MongoDB devuelve una URL, guardarla en Redis con el TTL configurado.
+5. Si no existe, responder `404 Not Found` con
    `SHORT_URL_NOT_FOUND`.
-4. Responder con redirect temporal `302 Found` a la URL original.
+6. Responder con redirect temporal `302 Found` a la URL original.
 
-En la primera etapa, MongoDB es la única fuente utilizada por este endpoint. La
-extensión de cache y eventos agregará:
+MongoDB sigue siendo la fuente de verdad. Los fallos de lectura o escritura en Redis
+se registran, pero no impiden resolver mediante MongoDB ni responder un redirect
+válido.
 
-1. Resolver mediante Redis con fallback a MongoDB.
-2. Si no existe, responder `404 Not Found`.
-3. Publicar `tinyurl.accessed.v1`.
-4. Mantener el redirect aunque Redis o la publicación del evento fallen.
+La siguiente extensión publicará `tinyurl.accessed.v1` después de una resolución
+exitosa y mantendrá el redirect aunque la publicación falle.
 
 Se usa `302` para evitar que clientes o navegadores conviertan la redirección en una
 decisión permanente y dejen de llegar accesos a la aplicación.

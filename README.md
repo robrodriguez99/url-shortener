@@ -51,8 +51,42 @@ npm run docker:up
 npm run docker:logs
 npm run docker:logs:api
 npm run docker:mongo
+npm run docker:redis
+npm run docker:ps
 npm run docker:down
 ```
+
+### Runtime operations
+
+Check container status and health:
+
+```bash
+npm run docker:ps
+```
+
+Follow all service logs or only API logs:
+
+```bash
+npm run docker:logs
+npm run docker:logs:api
+```
+
+Open MongoDB and Redis shells:
+
+```bash
+npm run docker:mongo
+npm run docker:redis
+```
+
+When `package.json` or `package-lock.json` changes while Compose is already running,
+update the persistent API `node_modules` volume and restart the service:
+
+```bash
+docker compose run --rm api npm ci
+docker compose restart api
+```
+
+Rebuilding the image alone does not update the mounted `api_node_modules` volume.
 
 ## Creating URLs
 
@@ -70,6 +104,12 @@ Custom alias:
 curl -X POST http://localhost:3000/api/urls \
   -H "Content-Type: application/json" \
   -d '{"originalUrl":"https://example.com","alias":"example"}'
+```
+
+Resolve a URL without following the redirect:
+
+```bash
+curl -i http://localhost:3000/example
 ```
 
 ## Logging
@@ -223,12 +263,37 @@ database:   url_shortener
 collection: shorturls
 ```
 
+## Redis
+
+Redis caches resolved destination URLs using:
+
+```text
+short-url:{code} -> originalUrl
+```
+
+Entries expire after `REDIS_CACHE_TTL_SECONDS`, which defaults to 86400 seconds
+(24 hours). MongoDB remains the source of truth. Cache read and write failures are
+logged and do not prevent a valid redirect.
+
+Docker exposes Redis on `localhost:6379`. Inspect a cached URL with:
+
+```bash
+docker compose exec redis redis-cli GET short-url:example
+```
+
+Check its remaining TTL with:
+
+```bash
+docker compose exec redis redis-cli TTL short-url:example
+```
+
 ## Main Libraries
 
 | Library | Purpose |
 | --- | --- |
 | `express` | HTTP server, routes, and middleware |
 | `mongoose` | MongoDB models, indexes, queries, and connection |
+| `redis` | Redis client and URL resolution cache |
 | `zod` | Runtime validation and TypeScript type inference |
 | `dotenv` | Loads local `.env` variables |
 | `pino` | Structured application logging |
@@ -239,5 +304,4 @@ collection: shorturls
 | `tsx` | Runs TypeScript directly during development |
 | `typescript-eslint` | TypeScript-aware linting |
 
-Redis and RabbitMQ client libraries will be added when their application integrations
-are implemented.
+The RabbitMQ client library will be added when event publishing is implemented.

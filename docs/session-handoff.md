@@ -30,8 +30,11 @@ after the backend flows work.
 
 - Environment variables are loaded with dotenv and validated with Zod.
 - Mongoose connection and disconnection are implemented.
+- The Redis client uses the official `redis` package.
+- Redis connection and disconnection are integrated into the API lifecycle.
+- Redis startup failure is non-fatal; the API continues using MongoDB.
 - The API connects to MongoDB before opening its HTTP port.
-- `SIGINT` and `SIGTERM` trigger graceful HTTP/MongoDB shutdown.
+- `SIGINT` and `SIGTERM` trigger graceful HTTP/MongoDB/Redis shutdown.
 - `GET /health` returns `{ "status": "ok" }`.
 
 ### URL module
@@ -53,12 +56,17 @@ Implemented:
   - check code existence;
   - translate MongoDB duplicate-key `11000` into
     `DuplicateShortUrlCodeError`.
+- `url.cache.ts`
+  - reads and writes `short-url:{code}`;
+  - applies the configured Redis TTL;
+  - isolates Redis-specific cache operations.
 - `url.service.ts`
   - validates input with Zod;
   - creates with a custom alias;
   - generates an eight-character base64url code;
   - retries generated-code collisions up to five times;
-  - resolves validated codes through MongoDB;
+  - resolves validated codes with Redis cache-aside and MongoDB fallback;
+  - treats Redis read and write failures as non-fatal;
   - returns the original URL or throws `ShortUrlNotFoundError`;
   - builds the public short URL;
   - supports dependency injection for unit tests.
@@ -89,8 +97,10 @@ POST /api/urls
 GET /:code
   -> resolveUrlController
   -> resolveUrl service
-  -> findShortUrlByCode repository
-  -> MongoDB
+  -> Redis cache
+  -> findShortUrlByCode repository on miss
+  -> MongoDB fallback
+  -> populate Redis
   -> 302 redirect
 ```
 
@@ -175,8 +185,8 @@ codes.
 
 At this handoff:
 
-- 8 test files;
-- 24 tests;
+- 9 test files;
+- 29 tests;
 - typecheck passes;
 - lint passes;
 - build passes;
@@ -190,15 +200,17 @@ Covered areas:
 - click event schema;
 - URL service behavior;
 - URL resolution service behavior;
+- URL cache keys and TTL;
+- cache hit, cache miss, Redis read failure, and Redis write failure;
 - URL redirect and resolution HTTP behavior;
 - MongoDB duplicate-key translation;
 - HTTP error serialization.
 
 ## Next Task
 
-Implement URL resolution Stage 2: cache and asynchronous access event.
+Implement RabbitMQ publishing for successful URL resolutions.
 
-Extend the existing resolution flow:
+Extend the current cache-aside resolution flow:
 
 ```text
 GET /:code
@@ -211,21 +223,16 @@ GET /:code
 
 Tasks:
 
-1. Add Redis client dependency and connection lifecycle.
-2. Create `url.cache.ts` using key `short-url:{code}` and configured TTL.
-3. Implement cache-aside with MongoDB fallback.
-4. Treat Redis failures as non-fatal and continue with MongoDB.
-5. Add RabbitMQ client and connection lifecycle.
-6. Publish persistent `tinyurl.accessed.v1` events after successful resolution.
-7. Do not block a valid redirect if event publication fails; log the failure.
-8. Add cache hit, cache miss, Redis failure, and publisher tests.
+1. Add RabbitMQ client dependency and connection lifecycle.
+2. Publish persistent `tinyurl.accessed.v1` events after successful resolution.
+3. Do not block a valid redirect if event publication fails; log the failure.
+4. Add publisher success and failure tests.
 
 Do not implement the worker in these two stages. The worker is the following vertical
 flow after publishing works.
 
 ## Known Pending Work
 
-- Redis connection and URL cache.
 - RabbitMQ connection and publisher.
 - Worker and RabbitMQ consumer.
 - Click repository and statistics endpoint.

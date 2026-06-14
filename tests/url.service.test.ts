@@ -145,34 +145,97 @@ describe("createUrl", () => {
 });
 
 describe("resolveUrl", () => {
-  it("returns the original URL for an existing code", async () => {
+  it("returns a cached original URL without querying MongoDB", async () => {
+    const findShortUrlByCode = vi.fn();
+    const cacheOriginalUrl = vi.fn();
+
+    const result = await resolveUrl("cached-code", {
+      getCachedOriginalUrl: vi
+        .fn()
+        .mockResolvedValue("https://example.com/cached"),
+      findShortUrlByCode,
+      cacheOriginalUrl,
+    });
+
+    expect(result).toBe("https://example.com/cached");
+    expect(findShortUrlByCode).not.toHaveBeenCalled();
+    expect(cacheOriginalUrl).not.toHaveBeenCalled();
+  });
+
+  it("queries MongoDB and populates the cache on a cache miss", async () => {
     const findShortUrlByCode = vi.fn().mockResolvedValue({
       originalUrl: "https://example.com/destination",
     });
+    const cacheOriginalUrl = vi.fn().mockResolvedValue(undefined);
 
     const result = await resolveUrl("existing-code", {
+      getCachedOriginalUrl: vi.fn().mockResolvedValue(null),
       findShortUrlByCode,
+      cacheOriginalUrl,
     });
 
     expect(findShortUrlByCode).toHaveBeenCalledWith("existing-code");
+    expect(cacheOriginalUrl).toHaveBeenCalledWith(
+      "existing-code",
+      "https://example.com/destination",
+    );
     expect(result).toBe("https://example.com/destination");
   });
 
   it("throws a not found error for a missing code", async () => {
     await expect(
       resolveUrl("missing-code", {
+        getCachedOriginalUrl: vi.fn().mockResolvedValue(null),
         findShortUrlByCode: vi.fn().mockResolvedValue(null),
+        cacheOriginalUrl: vi.fn(),
       }),
     ).rejects.toBeInstanceOf(ShortUrlNotFoundError);
   });
 
+  it("falls back to MongoDB when reading from Redis fails", async () => {
+    const findShortUrlByCode = vi.fn().mockResolvedValue({
+      originalUrl: "https://example.com/fallback",
+    });
+
+    const result = await resolveUrl("existing-code", {
+      getCachedOriginalUrl: vi
+        .fn()
+        .mockRejectedValue(new Error("Redis unavailable")),
+      findShortUrlByCode,
+      cacheOriginalUrl: vi.fn().mockResolvedValue(undefined),
+    });
+
+    expect(findShortUrlByCode).toHaveBeenCalledWith("existing-code");
+    expect(result).toBe("https://example.com/fallback");
+  });
+
+  it("returns the MongoDB URL when writing to Redis fails", async () => {
+    const result = await resolveUrl("existing-code", {
+      getCachedOriginalUrl: vi.fn().mockResolvedValue(null),
+      findShortUrlByCode: vi.fn().mockResolvedValue({
+        originalUrl: "https://example.com/destination",
+      }),
+      cacheOriginalUrl: vi
+        .fn()
+        .mockRejectedValue(new Error("Redis unavailable")),
+    });
+
+    expect(result).toBe("https://example.com/destination");
+  });
+
   it("validates the code before calling the repository", async () => {
+    const getCachedOriginalUrl = vi.fn();
     const findShortUrlByCode = vi.fn();
 
     await expect(
-      resolveUrl("invalid code", { findShortUrlByCode }),
+      resolveUrl("invalid code", {
+        getCachedOriginalUrl,
+        findShortUrlByCode,
+        cacheOriginalUrl: vi.fn(),
+      }),
     ).rejects.toMatchObject({ name: "ZodError" });
 
+    expect(getCachedOriginalUrl).not.toHaveBeenCalled();
     expect(findShortUrlByCode).not.toHaveBeenCalled();
   });
 });

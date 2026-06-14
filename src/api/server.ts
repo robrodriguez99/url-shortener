@@ -4,10 +4,23 @@ import {
   connectMongo,
   disconnectMongo,
 } from "../infrastructure/mongo/connection.js";
+import {
+  connectRedis,
+  disconnectRedis,
+} from "../infrastructure/redis/connection.js";
 import { logger } from "../shared/logger/logger.js";
 
 async function startServer(): Promise<void> {
   await connectMongo();
+
+  try {
+    await connectRedis();
+  } catch (error) {
+    logger.warn(
+      { err: error },
+      "Redis unavailable at startup; continuing without cache",
+    );
+  }
 
   const app = createApp();
   const server = app.listen(config.port, () => {
@@ -36,7 +49,7 @@ async function startServer(): Promise<void> {
         });
       });
 
-      await disconnectMongo();
+      await Promise.all([disconnectRedis(), disconnectMongo()]);
     } catch (error) {
       logger.error({ err: error }, "failed to shut down cleanly");
       process.exitCode = 1;

@@ -13,6 +13,8 @@
     "docker:logs": "docker compose logs --follow",
     "docker:logs:api": "docker compose logs --follow api",
     "docker:mongo": "docker compose exec mongo mongosh url_shortener",
+    "docker:redis": "docker compose exec redis redis-cli",
+    "docker:ps": "docker compose ps",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "test": "vitest run",
@@ -43,6 +45,7 @@
     "mongoose": "^9.7.0",
     "pino": "^10.3.1",
     "pino-http": "^11.0.0",
+    "redis": "^6.0.0",
     "zod": "^4.4.3"
   }
 }

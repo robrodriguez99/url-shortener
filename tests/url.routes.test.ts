@@ -4,6 +4,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createApp } from "../src/api/app.js";
 import { findShortUrlByCode } from "../src/modules/urls/url.repository.js";
 
+vi.mock("../src/modules/urls/url.cache.js", () => ({
+  cacheOriginalUrl: vi.fn().mockResolvedValue(undefined),
+  getCachedOriginalUrl: vi.fn().mockResolvedValue(null),
+}));
+
 vi.mock("../src/modules/urls/url.repository.js", () => ({
   createShortUrl: vi.fn(),
   findShortUrlByCode: vi.fn(),

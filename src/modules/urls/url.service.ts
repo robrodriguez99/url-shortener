@@ -1,6 +1,10 @@
 import { randomBytes } from "node:crypto";
 
 import {
+  cacheOriginalUrl,
+  getCachedOriginalUrl,
+} from "./url.cache.js";
+import {
   DuplicateShortUrlCodeError,
   ShortUrlCodeConflictError,
   ShortUrlCodeGenerationError,
@@ -36,9 +40,14 @@ type CreateUrlDependencies = {
 };
 
 type ResolveUrlDependencies = {
+  getCachedOriginalUrl: (code: string) => Promise<string | null>;
   findShortUrlByCode: (
     code: string,
   ) => Promise<{ originalUrl: string } | null>;
+  cacheOriginalUrl: (
+    code: string,
+    originalUrl: string,
+  ) => Promise<void>;
 };
 
 const defaultCreateUrlDependencies: CreateUrlDependencies = {
@@ -48,7 +57,9 @@ const defaultCreateUrlDependencies: CreateUrlDependencies = {
 };
 
 const defaultResolveUrlDependencies: ResolveUrlDependencies = {
+  getCachedOriginalUrl,
   findShortUrlByCode,
+  cacheOriginalUrl,
 };
 
 export async function createUrl(
@@ -93,13 +104,58 @@ export async function resolveUrl(
   dependencies: ResolveUrlDependencies = defaultResolveUrlDependencies,
 ): Promise<string> {
   const validatedCode = shortUrlCodeSchema.parse(code);
+  const cachedOriginalUrl = await readCachedOriginalUrl(
+    validatedCode,
+    dependencies,
+  );
+
+  if (cachedOriginalUrl !== null) {
+    return cachedOriginalUrl;
+  }
+
   const shortUrl = await dependencies.findShortUrlByCode(validatedCode);
 
   if (shortUrl === null) {
     throw new ShortUrlNotFoundError(validatedCode);
   }
 
+  await writeCachedOriginalUrl(
+    validatedCode,
+    shortUrl.originalUrl,
+    dependencies,
+  );
+
   return shortUrl.originalUrl;
+}
+
+async function readCachedOriginalUrl(
+  code: string,
+  dependencies: ResolveUrlDependencies,
+): Promise<string | null> {
+  try {
+    return await dependencies.getCachedOriginalUrl(code);
+  } catch (error) {
+    urlServiceLogger.warn(
+      { err: error, code },
+      "failed to read short URL cache",
+    );
+    return null;
+  }
+}
+
+async function writeCachedOriginalUrl(
+  code: string,
+  originalUrl: string,
+  dependencies: ResolveUrlDependencies,
+): Promise<void> {
+  try {
+    await dependencies.cacheOriginalUrl(code, originalUrl);
+  } catch (error) {
+    urlServiceLogger.warn(
+      { err: error, code },
+      "failed to write short URL cache",
+    );
+  }
 }
 
 async function createUrlWithAlias(
