@@ -55,6 +55,8 @@ errors or documents beyond the persistence boundary when a plain type is suffici
   Redis -> MongoDB on miss -> populate Redis.
 - A Redis failure must fall back to MongoDB for resolution.
 - RabbitMQ is only for asynchronous access events, not URL creation.
+- RabbitMQ credentials are mandatory Compose variables. Never add password defaults
+  or real credentials to Compose, `.env.example`, docs, or source code.
 
 ## URL Rules
 

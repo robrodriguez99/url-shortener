@@ -33,9 +33,10 @@ RabbitMQ Management is available at:
 
 ```text
 http://localhost:15672
-username: app
-password: app
 ```
+
+Use the `RABBITMQ_USER` and `RABBITMQ_PASSWORD` values from your local `.env`.
+Compose refuses to start if either variable is missing.
 
 ## Commands
 
@@ -240,4 +241,3 @@ collection: shorturls
 
 Redis and RabbitMQ client libraries will be added when their application integrations
 are implemented.
-

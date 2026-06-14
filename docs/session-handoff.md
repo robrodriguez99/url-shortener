@@ -251,6 +251,7 @@ RabbitMQ Management UI:
 
 ```text
 http://localhost:15672
-username: app
-password: app
 ```
+
+Credentials come from the ignored local `.env`. `RABBITMQ_USER` and
+`RABBITMQ_PASSWORD` are mandatory in Compose and have no repository defaults.

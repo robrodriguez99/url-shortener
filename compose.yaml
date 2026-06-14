@@ -11,7 +11,7 @@ services:
       MONGODB_URI: mongodb://mongo:27017/url_shortener
       REDIS_URL: redis://redis:6379
       REDIS_CACHE_TTL_SECONDS: ${REDIS_CACHE_TTL_SECONDS:-86400}
-      RABBITMQ_URL: amqp://${RABBITMQ_USER:-app}:${RABBITMQ_PASSWORD:-app}@rabbitmq:5672
+      RABBITMQ_URL: "amqp://${RABBITMQ_USER:?RABBITMQ_USER is required}:${RABBITMQ_PASSWORD:?RABBITMQ_PASSWORD is required}@rabbitmq:5672"
       RABBITMQ_EXCHANGE: ${RABBITMQ_EXCHANGE:-tinyurl.events}
       RABBITMQ_ACCESS_QUEUE: ${RABBITMQ_ACCESS_QUEUE:-tinyurl.accessed.persist}
       LOG_LEVEL: ${LOG_LEVEL:-info}
@@ -78,8 +78,8 @@ services:
   rabbitmq:
     image: rabbitmq:4-management
     environment:
-      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-app}
-      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-app}
+      RABBITMQ_DEFAULT_USER: "${RABBITMQ_USER:?RABBITMQ_USER is required}"
+      RABBITMQ_DEFAULT_PASS: "${RABBITMQ_PASSWORD:?RABBITMQ_PASSWORD is required}"
     ports:
       - "${RABBITMQ_PORT:-5672}:5672"
       - "${RABBITMQ_MANAGEMENT_PORT:-15672}:15672"
