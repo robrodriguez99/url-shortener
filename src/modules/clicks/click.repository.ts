@@ -30,9 +30,8 @@ export async function saveClickEvent(
 }
 
 export async function countClicksByCode(code: string): Promise<number> {
-  // Por simplicidad lo contamos todas las entradas
-  // En un sistema real tendria un registro que ya tenga las entradas contadas
-  // :D
+  // The assessment counts raw events for simplicity. At scale, the worker
+  // should maintain a per-code aggregate updated atomically.
   return ClickEventModel.countDocuments({ code }).exec();
 }
 

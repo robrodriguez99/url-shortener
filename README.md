@@ -6,6 +6,8 @@ and Docker Compose.
 The architecture and current implementation status are documented in:
 
 - `docs/design-doc.md`
+- `docs/resumen-diseno.md`
+- `docs/entrega-tecnica.md`
 - `docs/session-handoff.md`
 - `AGENTS.md`
 
@@ -117,6 +119,8 @@ curl -X POST http://localhost:3000/api/urls \
   -H "Content-Type: application/json" \
   -d '{"originalUrl":"https://example.com","alias":"example"}'
 ```
+
+`health` is reserved for the operational endpoint and cannot be used as an alias.
 
 Resolve a URL without following the redirect:
 
@@ -333,8 +337,9 @@ durable queue:   tinyurl.accessed.persist
 ```
 
 Messages are JSON, marked persistent, and published through a confirmation channel.
-Publishing or connection failures are logged but do not prevent a valid `302`
-redirect.
+The API waits at most `RABBITMQ_PUBLISH_TIMEOUT_MS`, which defaults to 1000 ms, for
+the broker confirmation. Publishing failures or timeouts are logged but do not
+prevent a valid `302` redirect.
 
 The worker consumes `tinyurl.accessed.persist` with manual acknowledgements:
 

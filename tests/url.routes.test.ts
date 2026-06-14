@@ -63,6 +63,41 @@ describe("POST /api/urls", () => {
       },
     ]);
   });
+
+  it("returns 400 for malformed JSON", async () => {
+    const response = await request(createApp())
+      .post("/api/urls")
+      .set("Content-Type", "application/json")
+      .send('{"originalUrl":');
+
+    expect(response.status).toBe(400);
+    expect(response.body).toEqual({
+      error: {
+        code: "INVALID_JSON",
+        message: "Request body contains invalid JSON",
+      },
+    });
+  });
+
+  it("returns 413 for a body larger than the JSON parser limit", async () => {
+    const response = await request(createApp())
+      .post("/api/urls")
+      .set("Content-Type", "application/json")
+      .send(
+        JSON.stringify({
+          originalUrl: "https://example.com",
+          padding: "x".repeat(101 * 1_024),
+        }),
+      );
+
+    expect(response.status).toBe(413);
+    expect(response.body).toEqual({
+      error: {
+        code: "PAYLOAD_TOO_LARGE",
+        message: "Request body is too large",
+      },
+    });
+  });
 });
 
 describe("GET /:code", () => {
@@ -107,5 +142,19 @@ describe("GET /:code", () => {
       },
     });
     expect(findShortUrlByCode).not.toHaveBeenCalled();
+  });
+});
+
+describe("unknown routes", () => {
+  it("returns the public error envelope", async () => {
+    const response = await request(createApp()).post("/unknown");
+
+    expect(response.status).toBe(404);
+    expect(response.body).toEqual({
+      error: {
+        code: "ROUTE_NOT_FOUND",
+        message: "Route not found",
+      },
+    });
   });
 });

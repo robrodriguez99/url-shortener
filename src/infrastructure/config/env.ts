@@ -14,6 +14,7 @@ const envSchema = z.object({
   RABBITMQ_URL: z.string().min(1, "RABBITMQ_URL is required"),
   RABBITMQ_EXCHANGE: z.string().min(1).default("tinyurl.events"),
   RABBITMQ_ACCESS_QUEUE: z.string().min(1).default("tinyurl.accessed.persist"),
+  RABBITMQ_PUBLISH_TIMEOUT_MS: z.coerce.number().int().positive().default(1_000),
   LOG_LEVEL: z
     .enum(["fatal", "error", "warn", "info", "debug", "trace"])
     .default("info"),
@@ -37,5 +38,6 @@ export const config = {
   rabbitmqUrl: parsedEnv.data.RABBITMQ_URL,
   rabbitmqExchange: parsedEnv.data.RABBITMQ_EXCHANGE,
   rabbitmqAccessQueue: parsedEnv.data.RABBITMQ_ACCESS_QUEUE,
+  rabbitmqPublishTimeoutMs: parsedEnv.data.RABBITMQ_PUBLISH_TIMEOUT_MS,
   logLevel: parsedEnv.data.LOG_LEVEL,
 } as const;

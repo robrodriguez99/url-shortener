@@ -12,10 +12,19 @@ import {
   connectRabbitMq,
   disconnectRabbitMq,
 } from "../infrastructure/rabbitmq/connection.js";
+import { ClickEventModel } from "../modules/clicks/click.model.js";
+import { ShortUrlModel } from "../modules/urls/url.model.js";
 import { logger } from "../shared/logger/logger.js";
 
 async function startServer(): Promise<void> {
   await connectMongo();
+
+  try {
+    await Promise.all([ShortUrlModel.init(), ClickEventModel.init()]);
+  } catch (error) {
+    await disconnectMongo();
+    throw error;
+  }
 
   try {
     await connectRedis();

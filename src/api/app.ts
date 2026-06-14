@@ -2,7 +2,10 @@ import express from "express";
 
 import { clickRouter } from "../modules/clicks/click.routes.js";
 import { urlRouter } from "../modules/urls/url.routes.js";
-import { errorHandler } from "../shared/errors/error-handler.js";
+import {
+  errorHandler,
+  notFoundHandler,
+} from "../shared/errors/error-handler.js";
 import { httpLogger } from "../shared/logger/http-logger.js";
 
 export function createApp() {
@@ -19,6 +22,7 @@ export function createApp() {
   app.use(urlRouter);
 
   // Error middleware must be registered after routes.
+  app.use(notFoundHandler);
   app.use(errorHandler);
 
   return app;

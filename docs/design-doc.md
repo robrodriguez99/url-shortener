@@ -56,7 +56,8 @@ alcance sin mejorar los flujos evaluados.
 
 RabbitMQ se elige sobre BullMQ o Redis Streams para mantener separados los roles de
 caché y mensajería y demostrar los conceptos pedidos por el assessment. La topología
-seguirá siendo pequeña: un exchange, una cola y un consumidor.
+se mantiene pequeña: un exchange, una cola y un tipo de consumidor, aunque pueden
+ejecutarse varias instancias del worker.
 
 ## 4. Arquitectura
 
@@ -70,7 +71,7 @@ API (Express)
   `---- RabbitMQ exchange
              |
              v
-        access-events queue
+    tinyurl.accessed.persist
              |
              v
           Worker
@@ -84,7 +85,7 @@ comparten configuración, contratos de eventos y acceso a datos.
 
 ## 5. Modelo de datos
 
-### `urls`
+### `shorturls`
 
 ```ts
 type ShortUrl = {
@@ -102,8 +103,9 @@ type ShortUrl = {
 - no se requiere índice en `originalUrl`, porque diferentes códigos pueden apuntar a
   la misma URL.
 
-`code` contiene tanto códigos generados como alias personalizados. Esto evita mantener
-dos caminos de resolución.
+Mongoose deriva la colección `shorturls` desde el modelo `ShortUrl`. `code` contiene
+tanto códigos generados como alias personalizados. Esto evita mantener dos caminos de
+resolución.
 
 ### `click_events`
 
@@ -129,6 +131,11 @@ Cada acceso se guarda como un documento independiente. Para este challenge, el
 endpoint de estadísticas usa `countDocuments({ code })` y busca el evento con el
 `occurredAt` más reciente. Esta decisión prioriza simplicidad y mantiene
 `click_events` como historial detallado.
+
+La API espera la inicialización de `ShortUrlModel` y `ClickEventModel` antes de abrir
+el puerto HTTP. El worker espera `ClickEventModel.init()` antes de consumir mensajes.
+Así, los índices que sostienen unicidad e idempotencia existen antes de recibir
+trabajo.
 
 Esta estrategia no escala bien para consultas frecuentes sobre un volumen grande,
 porque calcular `totalClicks` requiere contar eventos en cada request. En un sistema
@@ -202,6 +209,8 @@ Reglas:
 - `alias` es opcional;
 - códigos y aliases aceptan caracteres alfanuméricos, `-` y `_`;
 - códigos y aliases tienen entre 3 y 50 caracteres;
+- `health` se reserva para la ruta operativa y no puede usarse como alias,
+  independientemente de mayúsculas y minúsculas;
 - un alias existente responde `409 Conflict`;
 - si no hay alias, se genera un código base64url de 8 caracteres con
   `randomBytes(6)`;
@@ -230,8 +239,8 @@ se registran, pero no impiden resolver mediante MongoDB ni responder un redirect
 válido.
 
 Después de una resolución exitosa, la API publica `tinyurl.accessed.v1`. La
-publicación usa un canal de confirmación, pero cualquier fallo se registra y no cambia
-el redirect válido.
+publicación usa un canal de confirmación con un timeout configurable. Cualquier fallo
+o timeout se registra y no cambia el redirect válido.
 
 Se usa `302` para evitar que clientes o navegadores conviertan la redirección en una
 decisión permanente y dejen de llegar accesos a la aplicación.
@@ -269,8 +278,9 @@ click.routes -> click.controller -> click.service
 GET /health
 ```
 
-Devuelve el estado del proceso. Puede distinguir entre salud del servidor y
-disponibilidad de MongoDB, Redis y RabbitMQ para facilitar los healthchecks.
+Devuelve `200 OK` con `{ "status": "ok" }` para indicar que el proceso HTTP responde.
+No realiza un chequeo profundo de MongoDB, Redis o RabbitMQ. La API no abre el puerto
+si falla la conexión inicial a MongoDB; Redis y RabbitMQ son dependencias degradables.
 
 ## 8. Eventos y cola
 
@@ -352,18 +362,23 @@ src/
     server.ts
   worker/
     worker.ts
-    consumers/
   modules/
     urls/
       url.routes.ts
       url.controller.ts
       url.service.ts
       url.repository.ts
+      url.cache.ts
       url.model.ts
       url.schemas.ts
       url.errors.ts
     clicks/
+      click.routes.ts
+      click.controller.ts
+      click.service.ts
       click.repository.ts
+      click.publisher.ts
+      click.consumer.ts
       click.model.ts
       click.schemas.ts
   infrastructure/
@@ -373,7 +388,6 @@ src/
     rabbitmq/
   shared/
     errors/
-    events/
     logger/
 tests/
 ```
@@ -439,6 +453,7 @@ REDIS_CACHE_TTL_SECONDS
 RABBITMQ_URL
 RABBITMQ_EXCHANGE
 RABBITMQ_ACCESS_QUEUE
+RABBITMQ_PUBLISH_TIMEOUT_MS
 LOG_LEVEL
 ```
 
@@ -448,11 +463,11 @@ versiona.
 
 ## 12. Manejo de errores
 
-- `400`: body o parámetros inválidos;
-- `404`: código inexistente;
+- `400`: body, JSON o parámetros inválidos;
+- `404`: código o ruta inexistente;
 - `409`: alias en uso;
-- `500`: error interno inesperado;
-- `503`: dependencia indispensable no disponible cuando no existe fallback.
+- `413`: body mayor al límite del parser;
+- `500`: error interno inesperado.
 
 Los errores internos se registran con contexto, pero la API no expone stacks ni
 detalles de infraestructura.
@@ -471,7 +486,9 @@ Todas las respuestas HTTP de error usan:
 
 `details` es opcional. `AppError` representa errores esperados de aplicación y el
 middleware global `errorHandler` es el único responsable de serializarlos. Los errores
-de Zod se convierten en `400 VALIDATION_ERROR`; errores desconocidos se convierten en
+de Zod se convierten en `400 VALIDATION_ERROR`, JSON malformado en `400 INVALID_JSON`,
+bodies demasiado grandes en `413 PAYLOAD_TOO_LARGE` y rutas no registradas en
+`404 ROUTE_NOT_FOUND`. Los errores desconocidos se convierten en
 `500 INTERNAL_ERROR`.
 
 `errorHandler` se registra después de todas las rutas. En Express 5, si un controller
@@ -527,22 +544,25 @@ Consideraciones específicas:
 9. Ignorar de forma idempotente un `eventId` duplicado.
 10. Devolver `totalClicks` y `lastClick`.
 
-Para mantener el alcance, los tests unitarios cubren services y el contrato del worker;
-uno o dos tests de integración verifican el flujo HTTP con infraestructura real o
-contenedorizada.
+Los tests automatizados cubren schemas, repositories, services, controllers, rutas
+HTTP, publisher y consumer. Además, los flujos Redis/RabbitMQ/worker/estadísticas se
+verificaron manualmente contra la infraestructura Dockerizada.
 
-## 14. Orden de implementación
+## 14. Estado de implementación
 
-1. Inicializar TypeScript, scripts, linting y testing.
-2. Crear configuración validada y logging.
-3. Crear Dockerfile y Docker Compose con MongoDB, Redis y RabbitMQ.
-4. Implementar conexiones y apagado ordenado.
-5. Implementar modelo, repositorio y creación de URLs.
-6. Implementar resolución con cache-aside.
-7. Implementar publicación del evento.
-8. Implementar worker y persistencia de clicks.
-9. Implementar estadísticas.
-10. Agregar frontend mínimo, README y tests finales.
+Completado:
+
+1. TypeScript, linting, testing y build.
+2. Configuración validada y logging estructurado.
+3. Dockerfile y Docker Compose.
+4. Conexiones y apagado ordenado.
+5. Creación y resolución de URLs.
+6. Cache-aside con Redis.
+7. Publicación de eventos.
+8. Worker y persistencia idempotente de clicks.
+9. Endpoint de estadísticas.
+
+Pendiente fuera del backend principal: frontend mínimo.
 
 ## 15. Decisiones para revisar durante la implementación
 

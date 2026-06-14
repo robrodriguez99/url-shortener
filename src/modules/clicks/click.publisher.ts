@@ -6,6 +6,27 @@ import {
   type TinyUrlAccessedEvent,
 } from "./click.schemas.js";
 
+async function waitForPublisherConfirmation(
+  confirmation: Promise<void>,
+): Promise<void> {
+  let timeout: NodeJS.Timeout | undefined;
+
+  try {
+    await Promise.race([
+      confirmation,
+      new Promise<never>((_resolve, reject) => {
+        timeout = setTimeout(() => {
+          reject(new Error("RabbitMQ publisher confirmation timed out"));
+        }, config.rabbitmqPublishTimeoutMs);
+      }),
+    ]);
+  } finally {
+    if (timeout !== undefined) {
+      clearTimeout(timeout);
+    }
+  }
+}
+
 export async function publishTinyUrlAccessedEvent(
   event: TinyUrlAccessedEvent,
 ): Promise<void> {
@@ -24,5 +45,5 @@ export async function publishTinyUrlAccessedEvent(
     },
   );
 
-  await channel.waitForConfirms();
+  await waitForPublisherConfirmation(channel.waitForConfirms());
 }

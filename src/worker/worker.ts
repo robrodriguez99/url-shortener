@@ -9,10 +9,18 @@ import {
   disconnectRabbitMq,
 } from "../infrastructure/rabbitmq/connection.js";
 import { startClickConsumer } from "../modules/clicks/click.consumer.js";
+import { ClickEventModel } from "../modules/clicks/click.model.js";
 import { logger } from "../shared/logger/logger.js";
 
 async function startWorker(): Promise<void> {
   await connectMongo();
+
+  try {
+    await ClickEventModel.init();
+  } catch (error) {
+    await disconnectMongo();
+    throw error;
+  }
 
   let consumerChannel: Channel | undefined;
 

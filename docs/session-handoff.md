@@ -25,6 +25,9 @@ after the backend flows work.
   - Redis;
   - RabbitMQ with Management UI.
 - `README.md` documents setup, commands, logging, MongoDB access, and library roles.
+- `docs/entrega-tecnica.md` provides the Spanish technical delivery document.
+- `docs/resumen-diseno.md` provides a concise Spanish design summary and messaging
+  technology comparison.
 
 ### Infrastructure
 
@@ -38,6 +41,8 @@ after the backend flows work.
   lifecycles.
 - RabbitMQ startup failure is non-fatal; redirects continue without publishing.
 - The API connects to MongoDB before opening its HTTP port.
+- API and worker wait for the MongoDB indexes required by their models before serving
+  traffic or consuming messages.
 - `SIGINT` and `SIGTERM` trigger graceful HTTP/MongoDB/Redis/RabbitMQ shutdown.
 - `GET /health` returns `{ "status": "ok" }`.
 
@@ -48,6 +53,7 @@ Implemented:
 - `url.schemas.ts`
   - HTTP/HTTPS URL validation;
   - optional alias;
+  - reserved `health` alias rejection;
   - shared code validation: 3-50 characters, alphanumeric, `-`, `_`.
 - `url.model.ts`
   - `code`;
@@ -148,7 +154,7 @@ Implemented:
 - `click.publisher.ts`:
   - validates events with Zod;
   - publishes persistent JSON messages;
-  - waits for broker confirmation;
+  - waits for broker confirmation with a configurable timeout;
 - `click.repository.ts`:
   - persists access events in `click_events`;
   - maps duplicate `eventId` errors to an idempotent `duplicate` result;
@@ -205,6 +211,9 @@ Implemented:
 `details` is optional and is primarily used for validation issues.
 
 - Zod errors -> `400 VALIDATION_ERROR`;
+- malformed JSON -> `400 INVALID_JSON`;
+- oversized body -> `413 PAYLOAD_TOO_LARGE`;
+- unknown route -> `404 ROUTE_NOT_FOUND`;
 - alias conflict -> `409 SHORT_URL_CODE_CONFLICT`;
 - generated-code exhaustion -> `500 SHORT_URL_CODE_GENERATION_FAILED`;
 - missing code -> `404 SHORT_URL_NOT_FOUND`;
@@ -228,7 +237,7 @@ codes.
 At this handoff:
 
 - 15 test files;
-- 56 tests;
+- 61 tests;
 - typecheck passes;
 - lint passes;
 - build passes;
@@ -245,6 +254,7 @@ Covered areas:
 - URL cache keys and TTL;
 - cache hit, cache miss, Redis read failure, and Redis write failure;
 - event payload, persistent publishing, and broker confirmation;
+- publisher confirmation timeout;
 - event publication success and non-fatal failure;
 - click persistence and duplicate event idempotency;
 - consumer acknowledgement, rejection, and requeue policies;
@@ -252,6 +262,7 @@ Covered areas:
 - URL redirect and resolution HTTP behavior;
 - MongoDB duplicate-key translation;
 - HTTP error serialization.
+- malformed JSON, oversized payload, and unknown-route serialization.
 
 ## Next Task
 

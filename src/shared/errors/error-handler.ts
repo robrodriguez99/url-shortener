@@ -2,6 +2,7 @@ import type {
   ErrorRequestHandler,
   NextFunction,
   Request,
+  RequestHandler,
   Response,
 } from "express";
 import { ZodError } from "zod";
@@ -17,6 +18,39 @@ type ErrorResponse = {
   };
 };
 
+type ExpressBodyError = Error & {
+  status?: unknown;
+  type?: unknown;
+};
+
+function isExpressBodyError(
+  error: unknown,
+  type: string,
+  status: number,
+): error is ExpressBodyError {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+
+  const bodyError = error as ExpressBodyError;
+
+  return bodyError.type === type && bodyError.status === status;
+}
+
+export const notFoundHandler: RequestHandler = (
+  _request,
+  _response,
+  next,
+) => {
+  next(
+    new AppError({
+      code: "ROUTE_NOT_FOUND",
+      message: "Route not found",
+      statusCode: 404,
+    }),
+  );
+};
+
 export const errorHandler: ErrorRequestHandler = (
   error: unknown,
   request: Request,
@@ -25,6 +59,26 @@ export const errorHandler: ErrorRequestHandler = (
 ) => {
   void _next;
   const requestLogger = request.log ?? logger;
+
+  if (isExpressBodyError(error, "entity.parse.failed", 400)) {
+    response.status(400).json({
+      error: {
+        code: "INVALID_JSON",
+        message: "Request body contains invalid JSON",
+      },
+    });
+    return;
+  }
+
+  if (isExpressBodyError(error, "entity.too.large", 413)) {
+    response.status(413).json({
+      error: {
+        code: "PAYLOAD_TOO_LARGE",
+        message: "Request body is too large",
+      },
+    });
+    return;
+  }
 
   if (error instanceof ZodError) {
     response.status(400).json({

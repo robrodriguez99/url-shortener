@@ -14,6 +14,7 @@ services:
       RABBITMQ_URL: "amqp://${RABBITMQ_USER:?RABBITMQ_USER is required}:${RABBITMQ_PASSWORD:?RABBITMQ_PASSWORD is required}@rabbitmq:5672"
       RABBITMQ_EXCHANGE: ${RABBITMQ_EXCHANGE:-tinyurl.events}
       RABBITMQ_ACCESS_QUEUE: ${RABBITMQ_ACCESS_QUEUE:-tinyurl.accessed.persist}
+      RABBITMQ_PUBLISH_TIMEOUT_MS: ${RABBITMQ_PUBLISH_TIMEOUT_MS:-1000}
       LOG_LEVEL: ${LOG_LEVEL:-info}
     ports:
       - "${PORT:-3000}:${PORT:-3000}"

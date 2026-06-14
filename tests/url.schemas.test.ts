@@ -44,4 +44,19 @@ describe("createUrlSchema", () => {
       }).success,
     ).toBe(false);
   });
+
+  it("rejects aliases reserved by application routes", () => {
+    expect(
+      createUrlSchema.safeParse({
+        originalUrl: "https://example.com",
+        alias: "health",
+      }).success,
+    ).toBe(false);
+    expect(
+      createUrlSchema.safeParse({
+        originalUrl: "https://example.com",
+        alias: "HEALTH",
+      }).success,
+    ).toBe(false);
+  });
 });
