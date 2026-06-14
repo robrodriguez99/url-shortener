@@ -124,6 +124,24 @@ Resolve a URL without following the redirect:
 curl -i http://localhost:3000/example
 ```
 
+Get statistics for an existing code:
+
+```bash
+curl -i http://localhost:3000/api/stats/example
+```
+
+Response:
+
+```json
+{
+  "code": "example",
+  "totalClicks": 2,
+  "lastClick": "2026-06-14T19:00:00.000Z"
+}
+```
+
+URLs without accesses return `totalClicks: 0` and `lastClick: null`.
+
 ## Logging
 
 The application uses:

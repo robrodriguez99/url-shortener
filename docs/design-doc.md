@@ -125,10 +125,28 @@ type ClickEvent = {
 - índice único en `eventId`, para hacer idempotente el consumidor;
 - índice compuesto `{ code: 1, occurredAt: -1 }`, para estadísticas.
 
-No se guarda inicialmente `totalClicks` dentro de `urls`. El endpoint de estadísticas
-usa `countDocuments` y busca el último evento. Para el volumen del challenge es simple
-y consistente. En un sistema de mayor escala, el worker podría mantener un agregado
-atómico separado.
+Cada acceso se guarda como un documento independiente. Para este challenge, el
+endpoint de estadísticas usa `countDocuments({ code })` y busca el evento con el
+`occurredAt` más reciente. Esta decisión prioriza simplicidad y mantiene
+`click_events` como historial detallado.
+
+Esta estrategia no escala bien para consultas frecuentes sobre un volumen grande,
+porque calcular `totalClicks` requiere contar eventos en cada request. En un sistema
+real, el worker mantendría además un documento agregado por código en una colección
+como `click_stats`:
+
+```ts
+type ClickStats = {
+  code: string;
+  totalClicks: number;
+  lastClick: Date;
+};
+```
+
+El worker lo actualizaría atómicamente con `$inc` para `totalClicks` y `$max` para
+`lastClick`. El endpoint consultaría ese único documento por URL. Los eventos
+individuales podrían conservarse para auditoría o análisis detallado, pero no serían
+recorridos ni contados para responder cada consulta de estadísticas.
 
 ## 6. Redis
 
@@ -236,6 +254,14 @@ Respuesta `200 OK`:
 
 Si la URL existe pero no tiene accesos, `totalClicks` es `0` y `lastClick` es `null`.
 Si el código no existe en `urls`, se responde `404 Not Found`.
+
+Implementación actual:
+
+```text
+click.routes -> click.controller -> click.service
+  -> url.repository para verificar existencia
+  -> click.repository para total y último acceso
+```
 
 ### Operación
 

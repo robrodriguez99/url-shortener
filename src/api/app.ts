@@ -1,5 +1,6 @@
 import express from "express";
 
+import { clickRouter } from "../modules/clicks/click.routes.js";
 import { urlRouter } from "../modules/urls/url.routes.js";
 import { errorHandler } from "../shared/errors/error-handler.js";
 import { httpLogger } from "../shared/logger/http-logger.js";
@@ -14,6 +15,7 @@ export function createApp() {
     response.status(200).json({ status: "ok" });
   });
 
+  app.use(clickRouter);
   app.use(urlRouter);
 
   // Error middleware must be registered after routes.

@@ -2,7 +2,11 @@ import { mongo } from "mongoose";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ClickEventModel } from "../src/modules/clicks/click.model.js";
-import { saveClickEvent } from "../src/modules/clicks/click.repository.js";
+import {
+  countClicksByCode,
+  findLatestClickByCode,
+  saveClickEvent,
+} from "../src/modules/clicks/click.repository.js";
 import {
   TINY_URL_ACCESSED_EVENT_TYPE,
   type TinyUrlAccessedEvent,
@@ -60,5 +64,43 @@ describe("saveClickEvent repository", () => {
     vi.spyOn(ClickEventModel, "create").mockRejectedValueOnce(error);
 
     await expect(saveClickEvent(event)).rejects.toBe(error);
+  });
+});
+
+describe("click statistics repository", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("counts click events by code", async () => {
+    const exec = vi.fn().mockResolvedValue(12);
+    const countDocuments = vi
+      .spyOn(ClickEventModel, "countDocuments")
+      .mockReturnValue({ exec } as never);
+
+    await expect(countClicksByCode("example")).resolves.toBe(12);
+
+    expect(countDocuments).toHaveBeenCalledWith({ code: "example" });
+  });
+
+  it("finds the latest click by occurredAt", async () => {
+    const latestClick = {
+      occurredAt: new Date("2026-06-14T19:00:00.000Z"),
+    };
+    const exec = vi.fn().mockResolvedValue(latestClick);
+    const lean = vi.fn().mockReturnValue({ exec });
+    const select = vi.fn().mockReturnValue({ lean });
+    const sort = vi.fn().mockReturnValue({ select });
+    const findOne = vi
+      .spyOn(ClickEventModel, "findOne")
+      .mockReturnValue({ sort } as never);
+
+    await expect(findLatestClickByCode("example")).resolves.toEqual(
+      latestClick,
+    );
+
+    expect(findOne).toHaveBeenCalledWith({ code: "example" });
+    expect(sort).toHaveBeenCalledWith({ occurredAt: -1 });
+    expect(select).toHaveBeenCalledWith({ occurredAt: 1, _id: 0 });
   });
 });

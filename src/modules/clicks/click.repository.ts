@@ -28,3 +28,20 @@ export async function saveClickEvent(
     throw error;
   }
 }
+
+export async function countClicksByCode(code: string): Promise<number> {
+  // Por simplicidad lo contamos todas las entradas
+  // En un sistema real tendria un registro que ya tenga las entradas contadas
+  // :D
+  return ClickEventModel.countDocuments({ code }).exec();
+}
+
+export async function findLatestClickByCode(
+  code: string,
+): Promise<{ occurredAt: Date } | null> {
+  return ClickEventModel.findOne({ code })
+    .sort({ occurredAt: -1 })
+    .select({ occurredAt: 1, _id: 0 })
+    .lean<{ occurredAt: Date }>()
+    .exec();
+}

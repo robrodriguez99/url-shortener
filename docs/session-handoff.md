@@ -158,6 +158,13 @@ Implemented:
   - requeues transient persistence failures;
   - rejects invalid messages without requeue;
   - limits in-flight messages with `prefetch(10)`;
+- `click.service.ts`:
+  - validates statistics codes;
+  - verifies the URL exists;
+  - returns `totalClicks` and the latest `occurredAt`;
+- `click.controller.ts` and `click.routes.ts`:
+  - expose `GET /api/stats/:code`;
+  - are registered before the catch-all `GET /:code`;
 - unique index on `eventId`;
 - compound index `{ code: 1, occurredAt: -1 }`.
 
@@ -220,8 +227,8 @@ codes.
 
 At this handoff:
 
-- 12 test files;
-- 46 tests;
+- 15 test files;
+- 56 tests;
 - typecheck passes;
 - lint passes;
 - build passes;
@@ -241,35 +248,21 @@ Covered areas:
 - event publication success and non-fatal failure;
 - click persistence and duplicate event idempotency;
 - consumer acknowledgement, rejection, and requeue policies;
+- click statistics service, controller, repository queries, and HTTP route;
 - URL redirect and resolution HTTP behavior;
 - MongoDB duplicate-key translation;
 - HTTP error serialization.
 
 ## Next Task
 
-Implement the URL statistics endpoint.
+Add the minimal frontend after reviewing the remaining assessment requirements.
 
-Read the events persisted by the worker:
-
-```text
-GET /api/stats/:code
-  -> validate code
-  -> verify URL exists
-  -> count click_events
-  -> find latest occurredAt
-```
-
-Tasks:
-
-1. Add click count and latest-click repository queries.
-2. Add a statistics service and result type.
-3. Reuse `ShortUrlNotFoundError` for unknown valid codes.
-4. Add controller and `GET /api/stats/:code` before `GET /:code`.
-5. Add unit and HTTP tests.
+The backend now supports URL creation, resolution with cache-aside, asynchronous click
+persistence, and statistics. Before starting the frontend, compare the implemented
+HTTP contract and operational behavior against the original assessment PDF.
 
 ## Known Pending Work
 
-- Click statistics queries and endpoint.
 - Minimal frontend.
 
 ## Commands
