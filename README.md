@@ -3,13 +3,11 @@
 Tiny URL application built with React, Node.js, TypeScript, Express, MongoDB, Redis,
 RabbitMQ, Tailwind CSS, and Docker Compose.
 
-The architecture and current implementation status are documented in:
+The architecture and delivery documentation are available in:
 
 - `docs/design-doc.md`
 - `docs/resumen-diseno.md`
 - `docs/entrega-tecnica.md`
-- `docs/session-handoff.md`
-- `AGENTS.md`
 
 ## Requirements
 
@@ -199,7 +197,8 @@ HTTP log levels are:
 5xx     -> error
 ```
 
-Authorization and cookie headers are redacted. Request bodies are not logged.
+Authorization, cookie, and redirect `Location` headers are redacted. Request bodies
+are not logged.
 
 ### Application logs
 

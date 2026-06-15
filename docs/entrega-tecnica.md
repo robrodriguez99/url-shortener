@@ -375,8 +375,9 @@ Pino genera logs estructurados a stdout. `pino-http`:
 - usa `info` para `2xx/3xx`, `warn` para `4xx` y `error` para `5xx`;
 - excluye `/health` para reducir ruido.
 
-Authorization y cookies se redactan. Las URLs originales no se registran porque sus
-query params podrían contener información sensible.
+Authorization, cookies y el header de redirect `Location` se redactan. Las URLs
+originales no se registran porque sus query params podrían contener información
+sensible.
 
 Los módulos usan child loggers con un campo `module` estable.
 
@@ -479,6 +480,7 @@ Variables principales:
 | --- | --- |
 | `NODE_ENV` | Entorno de ejecución |
 | `PORT` | Puerto HTTP |
+| `FRONTEND_PORT` | Puerto local del servidor Vite |
 | `APP_BASE_URL` | Base usada para construir URLs cortas |
 | `VITE_API_ORIGIN` | Origen público usado para abrir códigos |
 | `VITE_API_PROXY_TARGET` | Destino del proxy API de Vite |
@@ -491,8 +493,10 @@ Variables principales:
 | `RABBITMQ_PUBLISH_TIMEOUT_MS` | Espera máxima de confirmación al publicar |
 | `LOG_LEVEL` | Nivel mínimo de Pino |
 
-La configuración se carga con dotenv y se valida con Zod al iniciar. `.env.example`
-documenta los valores locales y `.env` no se versiona.
+La configuración del backend se carga con dotenv y se valida con Zod al iniciar. Las
+variables `FRONTEND_PORT`, `VITE_API_ORIGIN` y `VITE_API_PROXY_TARGET` pertenecen a
+Compose/Vite y no al schema del backend. `.env.example` documenta los valores locales
+y `.env` no se versiona.
 
 Comandos principales:
 
@@ -508,7 +512,7 @@ npm run docker:logs:worker
 
 ## 14. Pruebas
 
-La suite versionada contiene 16 archivos y 64 tests. Cubre:
+La suite contiene 17 archivos y 66 tests. Cubre:
 
 - schemas de URL y eventos;
 - creación, colisiones y resolución;

@@ -89,7 +89,7 @@ La API y el worker son procesos distintos, pero viven en el mismo repositorio y
 comparten configuración, contratos de eventos y acceso a datos.
 
 El frontend vive en `frontend/`. En desarrollo, Vite sirve la interfaz en `5173` y
-proxyfía `/api` hacia Express. En producción, Express sirve el build estático de
+redirige `/api` hacia Express mediante su proxy. En producción, Express sirve el build estático de
 `frontend/dist`.
 
 ## 5. Modelo de datos
@@ -271,7 +271,7 @@ Respuesta `200 OK`:
 ```
 
 Si la URL existe pero no tiene accesos, `totalClicks` es `0` y `lastClick` es `null`.
-Si el código no existe en `urls`, se responde `404 Not Found`.
+Si el código no existe en `shorturls`, se responde `404 Not Found`.
 
 Implementación actual:
 
@@ -362,9 +362,15 @@ La redirección debe seguir funcionando y el error se registra.
 Una solución productiva con garantía más fuerte usaría un transactional outbox, pero
 queda explícitamente fuera de alcance por el tiempo y complejidad del challenge.
 
-## 9. Organización propuesta
+## 9. Organización
 
 ```text
+frontend/
+  src/
+    App.tsx
+    api.ts
+    main.tsx
+    styles.css
 src/
   api/
     app.ts
@@ -399,6 +405,7 @@ src/
     errors/
     logger/
 tests/
+  frontend/
 ```
 
 Responsabilidades:
@@ -408,7 +415,8 @@ Responsabilidades:
 - services: validan entradas runtime, implementan casos de uso y reglas;
 - repositories: acceso a MongoDB y traducción de errores específicos del proveedor;
 - infrastructure: conexiones con servicios externos;
-- worker/consumers: validación, persistencia y ack/nack de mensajes.
+- worker/consumers: validación, persistencia y ack/nack de mensajes;
+- frontend: interfaz y cliente HTTP para los casos de uso públicos.
 
 Cada módulo HTTP mantiene juntas sus rutas, controller, service y repository. `app.ts`
 registra los routers de los módulos. No se crean carpetas o capas vacías antes de que
@@ -435,7 +443,7 @@ Servicios objetivo:
 - volúmenes para MongoDB, Redis y RabbitMQ;
 - healthchecks;
 - `depends_on` basado en salud cuando sea útil;
-- puertos públicos solo para API y herramientas de desarrollo;
+- puertos expuestos para acceso y diagnóstico durante el desarrollo local;
 - variables desde `.env`.
 
 Estado actual: Compose incluye `frontend`, `api`, `worker`, `mongo`, `redis` y
@@ -458,6 +466,7 @@ Variables iniciales:
 ```text
 NODE_ENV
 PORT
+FRONTEND_PORT
 APP_BASE_URL
 VITE_API_ORIGIN
 VITE_API_PROXY_TARGET
@@ -471,9 +480,11 @@ RABBITMQ_PUBLISH_TIMEOUT_MS
 LOG_LEVEL
 ```
 
-La configuración se valida al iniciar. El proceso debe fallar rápidamente si falta una
-variable obligatoria. `.env.example` documenta valores de desarrollo y `.env` no se
-versiona.
+La configuración del backend se valida con Zod al iniciar y el proceso falla
+rápidamente si falta una variable obligatoria. `FRONTEND_PORT`,
+`VITE_API_ORIGIN` y `VITE_API_PROXY_TARGET` son consumidas por Docker Compose o Vite,
+no por el schema del backend. `.env.example` documenta valores de desarrollo y `.env`
+no se versiona.
 
 ## 12. Manejo de errores
 
@@ -528,9 +539,9 @@ en `x-request-id` y registra método, path, status y duración. Los services usa
 loggers con un campo `module` estable para eventos relevantes.
 
 No se registran URLs originales porque sus query params pueden contener datos
-sensibles. Headers de autorización y cookies se redactan. Los errores inesperados se
-registran una sola vez en el boundary HTTP o del proceso; los `4xx` esperados quedan
-representados por el log de finalización del request.
+sensibles. Headers de autorización, cookies y `Location` se redactan. Los errores
+inesperados se registran una sola vez en el boundary HTTP o del proceso; los `4xx`
+esperados quedan representados por el log de finalización del request.
 
 Los detalles de infraestructura se traducen en su boundary. Por ejemplo, el repository
 de URLs convierte el error MongoDB duplicate-key `11000` en
@@ -559,8 +570,9 @@ Consideraciones específicas:
 10. Devolver `totalClicks` y `lastClick`.
 
 Los tests automatizados cubren schemas, repositories, services, controllers, rutas
-HTTP, publisher y consumer. Además, los flujos Redis/RabbitMQ/worker/estadísticas se
-verificaron manualmente contra la infraestructura Dockerizada.
+HTTP, publisher, consumer, logging e interacciones del frontend. Además, los flujos
+Redis/RabbitMQ/worker/estadísticas se verificaron manualmente contra la
+infraestructura Dockerizada.
 
 ## 14. Estado de implementación
 

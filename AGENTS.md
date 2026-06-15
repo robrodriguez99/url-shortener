@@ -9,7 +9,7 @@ Read these files before making architectural changes:
 
 - `README.md`: setup, commands, libraries, logs, and local service access.
 - `docs/design-doc.md`: target architecture and technical decisions.
-- `docs/session-handoff.md`: current implementation status and next steps.
+- `docs/entrega-tecnica.md`: implementation and delivery overview.
 - `docs/Challenge Técnico – Backend Node.pdf`: original assessment.
 
 Keep the assessment intentionally small. Do not add authentication, users, URL editing,
