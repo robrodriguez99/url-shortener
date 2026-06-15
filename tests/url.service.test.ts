@@ -10,7 +10,10 @@ import {
   createUrl,
   resolveUrl,
 } from "../src/modules/urls/url.service.js";
-import { TINY_URL_ACCESSED_EVENT_TYPE } from "../src/modules/clicks/click.schemas.js";
+import {
+  CLICK_EVENT_MAX_USER_AGENT_LENGTH,
+  TINY_URL_ACCESSED_EVENT_TYPE,
+} from "../src/modules/clicks/click.schemas.js";
 
 const baseUrl = "http://localhost:3000";
 const eventId = "a9df919d-8e2a-44d6-84d6-63304c86267f";
@@ -202,6 +205,35 @@ describe("resolveUrl", () => {
         userAgent: "curl/8.7.1",
       },
     });
+  });
+
+  it("truncates oversized user agents before publishing", async () => {
+    const publishTinyUrlAccessedEvent = vi
+      .fn()
+      .mockResolvedValue(undefined);
+    const userAgent = "u".repeat(
+      CLICK_EVENT_MAX_USER_AGENT_LENGTH + 1,
+    );
+
+    await resolveUrl(
+      "cached-code",
+      { userAgent },
+      createResolveUrlDependencies({
+        getCachedOriginalUrl: vi
+          .fn()
+          .mockResolvedValue("https://example.com/cached"),
+        publishTinyUrlAccessedEvent,
+      }),
+    );
+
+    expect(publishTinyUrlAccessedEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: {
+          code: "cached-code",
+          userAgent: "u".repeat(CLICK_EVENT_MAX_USER_AGENT_LENGTH),
+        },
+      }),
+    );
   });
 
   it("queries MongoDB and populates the cache on a cache miss", async () => {

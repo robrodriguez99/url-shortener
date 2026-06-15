@@ -3,6 +3,12 @@ import pino from "pino";
 const nodeEnv = process.env.NODE_ENV ?? "development";
 const logLevel = process.env.LOG_LEVEL ?? "info";
 
+export const LOGGER_REDACT_PATHS = [
+  "req.headers.authorization",
+  "req.headers.cookie",
+  "res.headers.location",
+];
+
 const transport =
   nodeEnv === "development"
     ? {
@@ -24,7 +30,7 @@ export const logger = pino(
       environment: nodeEnv,
     },
     redact: {
-      paths: ["req.headers.authorization", "req.headers.cookie"],
+      paths: LOGGER_REDACT_PATHS,
       censor: "[REDACTED]",
     },
   },

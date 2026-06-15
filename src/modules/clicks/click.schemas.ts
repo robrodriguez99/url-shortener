@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 export const TINY_URL_ACCESSED_EVENT_TYPE = "tinyurl.accessed.v1";
+export const CLICK_EVENT_MAX_USER_AGENT_LENGTH = 1_024;
 
 const clickCodeSchema = z
   .string()
@@ -15,7 +16,11 @@ export const tinyUrlAccessedEventSchema = z.object({
   data: z.object({
     code: clickCodeSchema,
     ip: z.string().min(1).max(45).optional(),
-    userAgent: z.string().min(1).max(1_024).optional(),
+    userAgent: z
+      .string()
+      .min(1)
+      .max(CLICK_EVENT_MAX_USER_AGENT_LENGTH)
+      .optional(),
   }),
 });
 

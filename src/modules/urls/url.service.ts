@@ -2,6 +2,7 @@ import { randomBytes, randomUUID } from "node:crypto";
 
 import { publishTinyUrlAccessedEvent } from "../clicks/click.publisher.js";
 import {
+  CLICK_EVENT_MAX_USER_AGENT_LENGTH,
   TINY_URL_ACCESSED_EVENT_TYPE,
   type TinyUrlAccessedEvent,
 } from "../clicks/click.schemas.js";
@@ -154,6 +155,11 @@ async function publishAccessEvent(
   context: ResolveUrlContext,
   dependencies: ResolveUrlDependencies,
 ): Promise<void> {
+  const userAgent = context.userAgent?.slice(
+    0,
+    CLICK_EVENT_MAX_USER_AGENT_LENGTH,
+  );
+
   try {
     await dependencies.publishTinyUrlAccessedEvent({
       eventId: dependencies.createEventId(),
@@ -162,9 +168,7 @@ async function publishAccessEvent(
       data: {
         code,
         ...(context.ip === undefined ? {} : { ip: context.ip }),
-        ...(context.userAgent === undefined
-          ? {}
-          : { userAgent: context.userAgent }),
+        ...(userAgent === undefined ? {} : { userAgent }),
       },
     });
   } catch (error) {
