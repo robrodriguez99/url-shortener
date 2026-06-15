@@ -172,9 +172,8 @@ Agregar un handler de ruta no encontrada antes de `errorHandler` que produzca un
 
 La consigna pide una pantalla o endpoint para crear la TinyURL y aclara que el
 frontend, aunque no se evalua visualmente, debe permitir probar facilmente la
-creacion. El endpoint existe, pero el frontend minimo sigue pendiente. Esto no es una
-falla del backend ni de la arquitectura, pero si una brecha de completitud de la
-entrega original.
+creacion. Esta brecha quedó resuelta después de la revisión mediante un frontend
+mínimo en React que permite crear URLs, abrir códigos y consultar estadísticas.
 
 ## Limitaciones deliberadas que no considero findings
 

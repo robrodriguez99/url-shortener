@@ -1,7 +1,7 @@
 # URL Shortener
 
-Tiny URL backend built with Node.js, TypeScript, Express, MongoDB, Redis, RabbitMQ,
-and Docker Compose.
+Tiny URL application built with React, Node.js, TypeScript, Express, MongoDB, Redis,
+RabbitMQ, Tailwind CSS, and Docker Compose.
 
 The architecture and current implementation status are documented in:
 
@@ -13,7 +13,7 @@ The architecture and current implementation status are documented in:
 
 ## Requirements
 
-- Node.js 22 or newer.
+- Node.js 22.12 or newer.
 - npm.
 - Docker with Docker Compose.
 
@@ -25,10 +25,11 @@ npm install
 npm run docker:up
 ```
 
-The API is available at:
+The frontend and API are available at:
 
 ```text
-http://localhost:3000
+Frontend: http://localhost:5173
+API:      http://localhost:3000
 ```
 
 RabbitMQ Management is available at:
@@ -45,6 +46,8 @@ Compose refuses to start if either variable is missing.
 ```bash
 npm run dev
 npm run worker:dev
+npm run frontend:dev
+npm run frontend:build
 npm run typecheck
 npm run lint
 npm test
@@ -52,6 +55,7 @@ npm run build
 
 npm run docker:up
 npm run docker:logs
+npm run docker:logs:frontend
 npm run docker:logs:api
 npm run docker:logs:worker
 npm run docker:mongo
@@ -69,10 +73,11 @@ Check container status and health:
 npm run docker:ps
 ```
 
-Follow all service logs, API logs, or worker logs:
+Follow all service logs, frontend logs, API logs, or worker logs:
 
 ```bash
 npm run docker:logs
+npm run docker:logs:frontend
 npm run docker:logs:api
 npm run docker:logs:worker
 ```
@@ -91,16 +96,28 @@ npm run docker:rabbitmq
 ```
 
 When `package.json` or `package-lock.json` changes while Compose is already running,
-update the persistent API and worker `node_modules` volumes and restart both services:
+update the persistent frontend, API, and worker `node_modules` volumes and restart
+the services:
 
 ```bash
+docker compose run --rm frontend npm ci
 docker compose run --rm api npm ci
 docker compose run --rm worker npm ci
-docker compose restart api worker
+docker compose restart frontend api worker
 ```
 
-Rebuilding the image alone does not update the mounted `api_node_modules` and
-`worker_node_modules` volumes.
+Rebuilding the image alone does not update the mounted `node_modules` volumes.
+
+## Frontend
+
+The React interface at `http://localhost:5173` supports:
+
+- creating a short URL with an optional alias;
+- opening an existing code in a new tab;
+- querying total clicks and the latest access.
+
+Vite proxies `/api` requests to Express during development. Production builds are
+generated under `frontend/dist` and served by Express at `/`.
 
 ## Creating URLs
 
@@ -417,3 +434,8 @@ npm run docker:logs:worker
 | `supertest` | HTTP integration tests |
 | `tsx` | Runs TypeScript directly during development |
 | `typescript-eslint` | TypeScript-aware linting |
+| `cross-env` | Portable production environment for frontend builds |
+| `react` | Minimal interactive user interface |
+| `vite` | Frontend development server and production build |
+| `tailwindcss` | Utility-based frontend styling |
+| `@testing-library/react` | User-facing React component tests |

@@ -2,7 +2,7 @@
 
 ## 1. Objetivo
 
-El proyecto implementa un backend de URLs cortas que permite:
+El proyecto implementa una aplicación de URLs cortas que permite:
 
 - crear una URL corta con un código generado o un alias personalizado;
 - resolver el código y redirigir a la URL original;
@@ -19,6 +19,9 @@ un alcance acotado al challenge.
 Cliente
   |
   v
+Frontend React
+  |
+  v
 API Express
   |---- MongoDB: URLs y lectura de estadísticas
   |---- Redis: cache de resoluciones
@@ -33,6 +36,9 @@ API Express
 
 La API y el worker son procesos separados, pero comparten el mismo código,
 configuración y contrato de eventos.
+
+El frontend usa React y Tailwind CSS. Vite lo sirve en desarrollo y genera los assets
+estáticos que Express expone en producción.
 
 Dentro de cada funcionalidad HTTP se sigue esta dirección:
 

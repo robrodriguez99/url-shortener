@@ -1,5 +1,6 @@
 node_modules/
 dist/
+frontend/dist/
 coverage/
 
 .env
@@ -12,4 +13,3 @@ npm-debug.log*
 .DS_Store
 .idea/
 .vscode/
-

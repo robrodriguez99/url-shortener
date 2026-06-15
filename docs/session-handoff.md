@@ -4,9 +4,8 @@ Last updated: 2026-06-14
 
 ## Goal
 
-Complete the backend assessment in `docs/Challenge Técnico – Backend Node.pdf`.
-The immediate priority is the API. The frontend will remain minimal and be added only
-after the backend flows work.
+Complete the assessment in `docs/Challenge Técnico – Backend Node.pdf`. The backend
+and the minimal frontend flows are implemented.
 
 ## Current State
 
@@ -19,6 +18,7 @@ after the backend flows work.
 - Vitest, Supertest, and V8 coverage.
 - Development and production Dockerfile stages.
 - Docker Compose services:
+  - frontend;
   - API;
   - worker;
   - MongoDB;
@@ -45,6 +45,15 @@ after the backend flows work.
   traffic or consuming messages.
 - `SIGINT` and `SIGTERM` trigger graceful HTTP/MongoDB/Redis/RabbitMQ shutdown.
 - `GET /health` returns `{ "status": "ok" }`.
+
+### Frontend
+
+- React, Vite, and Tailwind CSS.
+- Creation form with optional alias.
+- Code resolution opens the short URL in a new tab.
+- Statistics form displays total clicks and last access.
+- Vite proxies `/api` to Express in development.
+- Express serves `frontend/dist` in production.
 
 ### URL module
 
@@ -236,8 +245,8 @@ codes.
 
 At this handoff:
 
-- 15 test files;
-- 61 tests;
+- 16 test files;
+- 64 tests;
 - typecheck passes;
 - lint passes;
 - build passes;
@@ -263,18 +272,12 @@ Covered areas:
 - MongoDB duplicate-key translation;
 - HTTP error serialization.
 - malformed JSON, oversized payload, and unknown-route serialization.
+- frontend creation, resolution, and statistics interactions.
 
 ## Next Task
 
-Add the minimal frontend after reviewing the remaining assessment requirements.
-
-The backend now supports URL creation, resolution with cache-aside, asynchronous click
-persistence, and statistics. Before starting the frontend, compare the implemented
-HTTP contract and operational behavior against the original assessment PDF.
-
-## Known Pending Work
-
-- Minimal frontend.
+Perform the final delivery review and manual browser verification through Docker
+Compose.
 
 ## Commands
 

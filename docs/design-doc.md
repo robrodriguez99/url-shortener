@@ -12,8 +12,8 @@ Construir un servicio de URLs cortas que permita:
 - consultar estadísticas básicas por código.
 
 El foco es demostrar diseño backend, separación de responsabilidades, validación,
-manejo de errores y uso correcto de MongoDB, Redis y una cola de mensajes. El frontend
-queda fuera del camino crítico.
+manejo de errores y uso correcto de MongoDB, Redis y una cola de mensajes. Se incluye
+un frontend mínimo para operar los flujos principales.
 
 ## 2. Alcance
 
@@ -24,6 +24,7 @@ queda fuera del camino crítico.
 - Redis con estrategia cache-aside.
 - RabbitMQ como message broker.
 - Worker separado para persistir eventos.
+- Frontend React para crear, abrir y consultar estadísticas.
 - Docker Compose para levantar todo el entorno.
 - Tests sobre los flujos principales.
 - Documentación de ejecución y decisiones.
@@ -46,13 +47,14 @@ alcance sin mejorar los flujos evaluados.
 | --- | --- | --- |
 | Runtime | Node.js + TypeScript | Requisito del challenge y tipado del dominio |
 | HTTP | Express | Framework conocido, simple y suficiente para el alcance |
+| Frontend | React + Vite + Tailwind CSS | UI pequeña, build rápido y estilos sin componentes externos |
 | Validación | Zod | Validación runtime e inferencia de tipos TypeScript |
 | Logging | Pino + pino-http | Logs estructurados, request IDs y bajo overhead |
 | Base de datos | MongoDB + Mongoose | Modelo documental simple e índices fáciles de expresar |
 | Caché | Redis | Lookup rápido `code -> originalUrl` |
 | Mensajería | RabbitMQ + `amqplib` | Broker explícito, acknowledgements, reentrega y colas durables |
 | Procesos | Una API y un worker | Separa request/response del procesamiento asincrónico |
-| Contenedores | Un Dockerfile, dos comandos | API y worker usan el mismo código e imagen |
+| Contenedores | Un Dockerfile, tres comandos | Frontend, API y worker comparten instalación e imagen base |
 
 RabbitMQ se elige sobre BullMQ o Redis Streams para mantener separados los roles de
 caché y mensajería y demostrar los conceptos pedidos por el assessment. La topología
@@ -62,7 +64,10 @@ ejecutarse varias instancias del worker.
 ## 4. Arquitectura
 
 ```text
-Client
+Browser
+  |
+  v
+React frontend
   |
   v
 API (Express)
@@ -82,6 +87,10 @@ API (Express)
 
 La API y el worker son procesos distintos, pero viven en el mismo repositorio y
 comparten configuración, contratos de eventos y acceso a datos.
+
+El frontend vive en `frontend/`. En desarrollo, Vite sirve la interfaz en `5173` y
+proxyfía `/api` hacia Express. En producción, Express sirve el build estático de
+`frontend/dist`.
 
 ## 5. Modelo de datos
 
@@ -412,14 +421,15 @@ por defecto. Esto permite probar reglas de negocio sin levantar MongoDB.
 
 Servicios objetivo:
 
+- `frontend`;
 - `api`;
 - `worker`;
 - `mongo`;
 - `redis`;
 - `rabbitmq` con management UI.
 
-`api` y `worker` se construyen desde el mismo Dockerfile y cambian únicamente el
-comando de inicio. Compose incluye:
+`frontend`, `api` y `worker` se construyen desde el mismo Dockerfile y cambian
+únicamente el comando de inicio. Compose incluye:
 
 - red interna por defecto;
 - volúmenes para MongoDB, Redis y RabbitMQ;
@@ -428,12 +438,14 @@ comando de inicio. Compose incluye:
 - puertos públicos solo para API y herramientas de desarrollo;
 - variables desde `.env`.
 
-Estado actual: Compose incluye `api`, `worker`, `mongo`, `redis` y `rabbitmq`. API y
-worker usan volúmenes `node_modules` separados durante desarrollo.
+Estado actual: Compose incluye `frontend`, `api`, `worker`, `mongo`, `redis` y
+`rabbitmq`. Los tres procesos de aplicación usan volúmenes `node_modules` separados
+durante desarrollo.
 
 Puertos locales sugeridos:
 
 - API: `3000`;
+- Frontend Vite: `5173`;
 - MongoDB: `27017`;
 - Redis: `6379`;
 - RabbitMQ AMQP: `5672`;
@@ -447,6 +459,8 @@ Variables iniciales:
 NODE_ENV
 PORT
 APP_BASE_URL
+VITE_API_ORIGIN
+VITE_API_PROXY_TARGET
 MONGODB_URI
 REDIS_URL
 REDIS_CACHE_TTL_SECONDS
@@ -561,8 +575,7 @@ Completado:
 7. Publicación de eventos.
 8. Worker y persistencia idempotente de clicks.
 9. Endpoint de estadísticas.
-
-Pendiente fuera del backend principal: frontend mínimo.
+10. Frontend mínimo con creación, resolución y estadísticas.
 
 ## 15. Decisiones para revisar durante la implementación
 

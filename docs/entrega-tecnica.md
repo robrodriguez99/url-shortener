@@ -2,7 +2,8 @@
 
 ## 1. Resumen
 
-El proyecto implementa un backend de URLs cortas con Node.js y TypeScript. Permite:
+El proyecto implementa una aplicación de URLs cortas con React, Node.js y TypeScript.
+Permite:
 
 - crear una URL corta con código generado o alias personalizado;
 - resolver el código mediante un redirect `302`;
@@ -12,13 +13,17 @@ El proyecto implementa un backend de URLs cortas con Node.js y TypeScript. Permi
 - persistir clicks de forma idempotente;
 - consultar estadísticas básicas por código.
 
-La solución utiliza Express, MongoDB, Redis, RabbitMQ y Docker Compose. La API y el
-worker son procesos separados que comparten modelos, configuración y contratos.
+La solución utiliza React, Vite, Tailwind CSS, Express, MongoDB, Redis, RabbitMQ y
+Docker Compose. La API y el worker son procesos separados que comparten modelos,
+configuración y contratos.
 
 ## 2. Arquitectura
 
 ```text
 Cliente
+  |
+  v
+Frontend React
   |
   v
 API Express
@@ -36,6 +41,7 @@ API Express
 El código se organiza por funcionalidad:
 
 ```text
+frontend/
 src/
   api/
   worker/
@@ -390,6 +396,11 @@ Los módulos usan child loggers con un campo `module` estable.
 | `supertest` | Tests HTTP |
 | `tsx` | Ejecución TypeScript en desarrollo |
 | `typescript-eslint` | Linting TypeScript |
+| `cross-env` | Entorno de build portable entre sistemas operativos |
+| `react` | Interfaz para operar la aplicación |
+| `vite` | Servidor y build del frontend |
+| `tailwindcss` | Estilos utilitarios |
+| `@testing-library/react` | Tests de interacción del frontend |
 
 ## 12. Endpoints
 
@@ -454,6 +465,7 @@ npm run docker:up
 Servicios locales:
 
 ```text
+Frontend:            http://localhost:5173
 API:                 http://localhost:3000
 MongoDB:             localhost:27017
 Redis:               localhost:6379
@@ -468,6 +480,8 @@ Variables principales:
 | `NODE_ENV` | Entorno de ejecución |
 | `PORT` | Puerto HTTP |
 | `APP_BASE_URL` | Base usada para construir URLs cortas |
+| `VITE_API_ORIGIN` | Origen público usado para abrir códigos |
+| `VITE_API_PROXY_TARGET` | Destino del proxy API de Vite |
 | `MONGODB_URI` | Conexión a MongoDB |
 | `REDIS_URL` | Conexión a Redis |
 | `REDIS_CACHE_TTL_SECONDS` | TTL de resoluciones cacheadas |
@@ -494,7 +508,7 @@ npm run docker:logs:worker
 
 ## 14. Pruebas
 
-La suite contiene 15 archivos y 61 tests. Cubre:
+La suite versionada contiene 16 archivos y 64 tests. Cubre:
 
 - schemas de URL y eventos;
 - creación, colisiones y resolución;
@@ -506,6 +520,7 @@ La suite contiene 15 archivos y 61 tests. Cubre:
 - políticas `ack`, `reject` y requeue;
 - repository, service, controller y ruta de estadísticas;
 - serialización global de errores.
+- creación, apertura por código y estadísticas desde React.
 
 También se verificaron manualmente contra Docker:
 
